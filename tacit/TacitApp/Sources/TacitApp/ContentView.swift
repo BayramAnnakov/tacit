@@ -22,6 +22,12 @@ struct ContentView: View {
                 await appVM.loadRepos()
                 await knowledgeVM.loadRules()
                 await proposalVM.loadProposals()
+                extractionVM.onExtractionComplete = { [knowledgeVM] in
+                    Task { await knowledgeVM.loadRules() }
+                }
+                proposalVM.onProposalReviewed = { [knowledgeVM] in
+                    Task { await knowledgeVM.loadRules() }
+                }
             }
     }
 
@@ -49,7 +55,7 @@ struct ContentView: View {
         case .teamKnowledge:
             KnowledgeBrowserView(vm: knowledgeVM)
         case .myDiscoveries:
-            MyDiscoveriesView(extractionVM: extractionVM)
+            MyDiscoveriesView(extractionVM: extractionVM, proposalVM: proposalVM)
         case .proposals:
             ProposalListView(vm: proposalVM)
         case .claudeMD:

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # --------------- Seed Data ---------------
 
 async def seed_demo_data() -> None:
-    """Seed the database with demo team members and sample proposals."""
+    """Seed the database with demo team members, proposals, rules, and decision trails."""
     # Team members
     await db.create_team_member("Bayram", "🎯", "team lead")
     await db.create_team_member("Alex", "⚡", "frontend dev")
@@ -34,7 +34,50 @@ async def seed_demo_data() -> None:
     if len(existing) > 0:
         return
 
-    # Sample proposals from Alex
+    # Create sample repository
+    repo = await db.create_repo("anthropics", "claude-code")
+    repo_id = repo["id"]
+
+    # --- Sample Knowledge Rules (pre-seeded for demo) ---
+    rules_data = [
+        ("Only use Anthropic's own API providers (direct Anthropic API, AWS Bedrock, Google Vertex). Third-party proxies are unsupported.",
+         "architecture", 0.95, "pr", "anthropics/claude-code#1247", repo_id),
+        ("Test subprocess interactions against non-POSIX shells (fish, nushell, zsh) in addition to bash.",
+         "testing", 0.90, "pr", "anthropics/claude-code#892", repo_id),
+        ("Extract distinct responsibilities from large service classes into separate utility classes.",
+         "architecture", 0.85, "pr", "anthropics/claude-code#1103", repo_id),
+        ("Use mock gateways in integration tests to prevent real HTTP calls.",
+         "testing", 0.80, "pr", "anthropics/claude-code#967", repo_id),
+        ("Replace complex conditional logic with rule-based decision maps using clear priority ordering.",
+         "style", 0.85, "pr", "anthropics/claude-code#1054", repo_id),
+        ("Do not require elevated permissions for terminal UI features to render correctly.",
+         "architecture", 0.75, "pr", "anthropics/claude-code#1301", repo_id),
+        ("Auto-lock closed issues after 7 days of inactivity.",
+         "workflow", 0.95, "pr", "anthropics/claude-code#788", repo_id),
+        ("Document security vulnerability reporting in a SECURITY.md file at the repository root.",
+         "security", 0.85, "pr", "anthropics/claude-code#1156", repo_id),
+    ]
+
+    for rule_text, category, confidence, source_type, source_ref, rid in rules_data:
+        rule = await db.insert_rule(rule_text, category, confidence, source_type, source_ref, rid)
+        await db.add_trail_entry(
+            rule_id=rule["id"],
+            event_type="created",
+            description=f"Extracted from {source_ref}",
+            source_ref=source_ref,
+        )
+
+    # Add a second trail entry on some rules (to show evolution)
+    first_rule = await db.get_rule(1)
+    if first_rule:
+        await db.add_trail_entry(
+            rule_id=1,
+            event_type="confidence_boost",
+            description="Confirmed by 3 additional PRs discussing API provider compatibility",
+            source_ref="anthropics/claude-code#1302,#1315,#1340",
+        )
+
+    # --- Sample Proposals ---
     await db.create_proposal(
         rule_text="Use @MainActor for all SwiftUI view models to ensure UI updates happen on the main thread",
         category="architecture",
@@ -49,8 +92,6 @@ async def seed_demo_data() -> None:
         source_excerpt="Alex: 'The team agreed in PR #42 that async/await is more readable than Combine chains for simple network requests.'",
         proposed_by="Alex",
     )
-
-    # Sample proposal from Sarah
     await db.create_proposal(
         rule_text="All API endpoints must return structured error responses with error_code and message fields",
         category="architecture",
@@ -58,9 +99,6 @@ async def seed_demo_data() -> None:
         source_excerpt="Sarah: 'Inconsistent error formats caused 3 frontend bugs last sprint. Standardizing on {error_code, message} format.'",
         proposed_by="Sarah",
     )
-
-    # Create a sample repository
-    await db.create_repo("anthropics", "claude-code")
 
     logger.info("Demo data seeded successfully")
 

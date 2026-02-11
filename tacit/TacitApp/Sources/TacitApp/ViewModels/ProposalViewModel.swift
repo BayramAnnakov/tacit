@@ -7,6 +7,9 @@ final class ProposalViewModel {
     var statusFilter: String? = "pending"
     var isLoading = false
 
+    /// Called when a proposal is approved or rejected
+    var onProposalReviewed: (() -> Void)?
+
     private let backend = BackendService.shared
 
     func loadProposals() async {
@@ -41,6 +44,8 @@ final class ProposalViewModel {
             if let index = proposals.firstIndex(where: { $0.id == id }) {
                 proposals[index] = updated
             }
+            selectedProposal = updated
+            onProposalReviewed?()
         } catch {
             // Error handled silently
         }
@@ -52,6 +57,8 @@ final class ProposalViewModel {
             if let index = proposals.firstIndex(where: { $0.id == id }) {
                 proposals[index] = updated
             }
+            selectedProposal = updated
+            onProposalReviewed?()
         } catch {
             // Error handled silently
         }

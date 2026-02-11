@@ -77,11 +77,41 @@ struct ClaudeMDEditorView: View {
 
     private var previewPane: some View {
         ScrollView {
-            Text(content)
-                .font(.system(.body, design: .default))
-                .textSelection(.enabled)
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(content.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
+                    if line.hasPrefix("# ") {
+                        Text(line.dropFirst(2))
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .padding(.top, 8)
+                    } else if line.hasPrefix("## ") {
+                        Text(line.dropFirst(3))
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.accentColor)
+                            .padding(.top, 12)
+                    } else if line.hasPrefix("### ") {
+                        Text(line.dropFirst(4))
+                            .font(.title3)
+                            .fontWeight(.medium)
+                            .padding(.top, 8)
+                    } else if line.hasPrefix("- ") {
+                        HStack(alignment: .top, spacing: 6) {
+                            Text("\u{2022}")
+                                .foregroundStyle(.secondary)
+                            Text(line.dropFirst(2))
+                                .textSelection(.enabled)
+                        }
+                        .padding(.leading, 8)
+                    } else if !line.isEmpty {
+                        Text(line)
+                            .textSelection(.enabled)
+                    }
+                }
+            }
+            .font(.system(.body, design: .default))
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(minWidth: 300)
         .background(.background)

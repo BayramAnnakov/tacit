@@ -15,7 +15,7 @@ struct KnowledgeBrowserView: View {
             await vm.loadRules(repoId: repoId)
         }
         .onChange(of: vm.searchText) { _, _ in
-            Task { await vm.loadRules(repoId: repoId) }
+            vm.debouncedSearch(repoId: repoId)
         }
         .onChange(of: vm.selectedCategory) { _, _ in
             Task { await vm.loadRules(repoId: repoId) }
@@ -46,7 +46,7 @@ struct KnowledgeBrowserView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(vm.categories, id: \.self) { cat in
-                        let label = cat.isEmpty ? "All" : cat
+                        let label = KnowledgeViewModel.displayName(for: cat)
                         Button {
                             vm.selectedCategory = cat
                         } label: {

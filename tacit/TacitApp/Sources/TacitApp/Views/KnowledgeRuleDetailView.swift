@@ -43,7 +43,7 @@ struct KnowledgeRuleDetailView: View {
         HStack(spacing: 12) {
             ConfidenceMeter(confidence: rule.confidence)
             VStack(alignment: .leading, spacing: 4) {
-                Text(rule.category)
+                Text(KnowledgeViewModel.displayName(for: rule.category))
                     .font(.headline)
                 HStack(spacing: 8) {
                     SourceBadge(sourceType: rule.sourceType)
@@ -84,10 +84,32 @@ struct KnowledgeRuleDetailView: View {
                 GridItem(.flexible())
             ], spacing: 12) {
                 MetadataCard(label: "Confidence", value: "\(Int(rule.confidence * 100))%", icon: "chart.bar.fill")
-                MetadataCard(label: "Category", value: rule.category, icon: "tag.fill")
+                MetadataCard(label: "Category", value: KnowledgeViewModel.displayName(for: rule.category), icon: "tag.fill")
                 MetadataCard(label: "Source", value: rule.sourceType == .pr ? "Pull Request" : "Conversation", icon: "doc.fill")
                 MetadataCard(label: "Created", value: rule.createdAt ?? "", icon: "calendar")
             }
+        }
+    }
+
+    private func trailColor(for eventType: String) -> Color {
+        switch eventType {
+        case "created": return .blue
+        case "approved": return .green
+        case "rejected": return .red
+        case "merged": return .orange
+        case "confidence_boost": return .purple
+        default: return .secondary
+        }
+    }
+
+    private func trailIcon(for eventType: String) -> String {
+        switch eventType {
+        case "created": return "plus.circle.fill"
+        case "approved": return "checkmark.circle.fill"
+        case "rejected": return "xmark.circle.fill"
+        case "merged": return "arrow.triangle.merge"
+        case "confidence_boost": return "arrow.up.circle.fill"
+        default: return "circle.fill"
         }
     }
 
@@ -98,20 +120,29 @@ struct KnowledgeRuleDetailView: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
 
-            ForEach(trail) { entry in
+            ForEach(Array(trail.enumerated()), id: \.element.id) { index, entry in
+                let color = trailColor(for: entry.eventType)
                 HStack(alignment: .top, spacing: 12) {
-                    Circle()
-                        .fill(.blue)
-                        .frame(width: 8, height: 8)
-                        .padding(.top, 6)
+                    VStack(spacing: 0) {
+                        Image(systemName: trailIcon(for: entry.eventType))
+                            .font(.system(size: 14))
+                            .foregroundStyle(color)
+                        if index < trail.count - 1 {
+                            Rectangle()
+                                .fill(color.opacity(0.3))
+                                .frame(width: 2)
+                                .frame(maxHeight: .infinity)
+                        }
+                    }
+                    .frame(width: 20)
 
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text(entry.eventType)
+                            Text(entry.eventType.replacingOccurrences(of: "_", with: " "))
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .textCase(.uppercase)
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(color)
                             Spacer()
                             Text(entry.timestamp ?? "")
                                 .font(.caption2)

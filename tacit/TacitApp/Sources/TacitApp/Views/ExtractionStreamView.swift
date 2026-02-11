@@ -153,11 +153,14 @@ struct ExtractionStreamView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
         .background(.bar)
+        .animation(.spring(duration: 0.3), value: vm.rulesDiscovered)
+        .animation(.spring(duration: 0.3), value: vm.patternsAnalyzed)
     }
 }
 
 struct EventCardView: View {
     let event: ExtractionEvent
+    @State private var glowOpacity: Double = 0.6
 
     var cardStyle: (Color, String, String) {
         switch event.type {
@@ -218,6 +221,14 @@ struct EventCardView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(color.opacity(event.type == .ruleDiscovered ? 0.4 : 0.15), lineWidth: event.type == .ruleDiscovered ? 2 : 1)
+        }
+        .shadow(color: event.type == .ruleDiscovered ? color.opacity(glowOpacity) : .clear, radius: 8)
+        .onAppear {
+            if event.type == .ruleDiscovered {
+                withAnimation(.easeOut(duration: 1.5)) {
+                    glowOpacity = 0
+                }
+            }
         }
     }
 }

@@ -34,6 +34,9 @@ final class ExtractionViewModel {
     var patternsAnalyzed = 0
     var patternsMerged = 0
 
+    /// Called when extraction completes successfully
+    var onExtractionComplete: (() -> Void)?
+
     private let backend = BackendService.shared
 
     func startExtraction(repoId: Int) async {
@@ -114,9 +117,11 @@ final class ExtractionViewModel {
             if event.data["stage"] == "done" {
                 isExtracting = false
                 backend.disconnectWebSocket()
+                onExtractionComplete?()
             }
         case .error:
-            break
+            isExtracting = false
+            backend.disconnectWebSocket()
         case .info:
             break
         }

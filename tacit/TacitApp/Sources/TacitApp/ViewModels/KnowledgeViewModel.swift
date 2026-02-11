@@ -9,9 +9,16 @@ final class KnowledgeViewModel {
     var selectedCategory = ""
     var isLoading = false
 
-    let categories = ["", "Architecture", "Code Style", "Testing", "Error Handling", "Performance", "Security", "Documentation", "Dependencies", "DevOps"]
+    let categories = ["", "architecture", "style", "testing", "workflow", "performance", "security", "general"]
+
+    /// Display name for a category value
+    static func displayName(for category: String) -> String {
+        if category.isEmpty { return "All" }
+        return category.replacingOccurrences(of: "_", with: " ").capitalized
+    }
 
     private let backend = BackendService.shared
+    private var searchDebounceTask: Task<Void, Never>?
 
     func loadRules(repoId: Int? = nil) async {
         isLoading = true
@@ -24,6 +31,15 @@ final class KnowledgeViewModel {
             )
         } catch {
             rules = []
+        }
+    }
+
+    func debouncedSearch(repoId: Int? = nil) {
+        searchDebounceTask?.cancel()
+        searchDebounceTask = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            await loadRules(repoId: repoId)
         }
     }
 
