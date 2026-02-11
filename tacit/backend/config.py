@@ -11,6 +11,7 @@ class Settings(BaseSettings):
 
     GITHUB_TOKEN: str = ""
     ANTHROPIC_API_KEY: str = ""
+    WEBHOOK_SECRET: str = ""
     DB_PATH: str = str(Path(__file__).parent / "tacit.db")
     LOG_DIR: str = str(Path(__file__).parent / "logs")
     HOST: str = "127.0.0.1"

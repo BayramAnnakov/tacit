@@ -1,20 +1,22 @@
 """FastAPI application with REST endpoints and WebSocket for Tacit."""
 
 import asyncio
+import difflib
 import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
+import httpx
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import database as db
 import proposals as prop
-from pipeline import run_extraction, run_local_extraction, generate_claude_md
+from pipeline import run_extraction, run_local_extraction, generate_claude_md, run_single_pr_extraction
 from config import settings
-from models import ExtractionEvent
+from models import ExtractionEvent, PRValidationRequest, RuleViolation, PRValidationResult
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -157,6 +159,10 @@ class ProposalReview(BaseModel):
     reviewed_by: str = ""
 
 
+class FeedbackRequest(BaseModel):
+    vote: str  # "up" or "down"
+
+
 class LocalExtractRequest(BaseModel):
     project_path: str
 
@@ -224,6 +230,55 @@ async def list_knowledge(
     return await db.list_rules(category=category, repo_id=repo_id)
 
 
+@app.get("/api/knowledge/cross-repo")
+async def get_cross_repo_patterns():
+    """Find shared knowledge patterns across repositories."""
+    from difflib import SequenceMatcher
+
+    all_rules = await db.list_rules()
+    all_repos = await db.list_repos()
+    repo_map = {r["id"]: r["full_name"] for r in all_repos}
+
+    # Group rules by category and find similar ones across repos
+    by_category: dict[str, list[dict]] = {}
+    for rule in all_rules:
+        cat = rule.get("category", "general")
+        by_category.setdefault(cat, []).append(rule)
+
+    org_patterns = []
+    seen = set()
+
+    for category, rules in by_category.items():
+        for i, r1 in enumerate(rules):
+            if r1["id"] in seen:
+                continue
+            group = [r1]
+            repos_set = {repo_map.get(r1.get("repo_id"), "unknown")}
+
+            for r2 in rules[i + 1:]:
+                if r2["id"] in seen:
+                    continue
+                similarity = SequenceMatcher(
+                    None, r1["rule_text"].lower(), r2["rule_text"].lower()
+                ).ratio()
+                if similarity > 0.6:
+                    group.append(r2)
+                    repos_set.add(repo_map.get(r2.get("repo_id"), "unknown"))
+                    seen.add(r2["id"])
+
+            if len(repos_set) > 1:
+                seen.add(r1["id"])
+                org_patterns.append({
+                    "rule_text": r1["rule_text"],
+                    "repos": sorted(repos_set),
+                    "frequency": len(group),
+                    "category": category,
+                })
+
+    org_patterns.sort(key=lambda p: p["frequency"], reverse=True)
+    return {"org_patterns": org_patterns}
+
+
 @app.get("/api/knowledge/{rule_id}")
 async def get_knowledge(rule_id: int):
     """Get a knowledge rule with its full decision trail."""
@@ -232,6 +287,25 @@ async def get_knowledge(rule_id: int):
         raise HTTPException(status_code=404, detail="Rule not found")
     trail = await db.get_trail_for_rule(rule_id)
     return {"rule": rule, "decision_trail": trail}
+
+
+@app.post("/api/knowledge/{rule_id}/feedback")
+async def submit_feedback(rule_id: int, body: FeedbackRequest):
+    """Submit feedback (upvote/downvote) for a knowledge rule."""
+    rule = await db.get_rule(rule_id)
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    delta = 1 if body.vote == "up" else -1
+    updated = await db.update_feedback_score(rule_id, delta)
+    return updated
+
+
+@app.get("/api/stats/source-quality")
+async def get_source_quality():
+    """Get aggregated quality stats by source type."""
+    stats = await db.get_source_quality_stats()
+    return {"source_quality": stats}
 
 
 # --------------- Proposal Endpoints ---------------
@@ -282,6 +356,163 @@ async def get_claude_md(repo_id: int):
     return {"repo": repo["full_name"], "content": content}
 
 
+@app.get("/api/claude-md/{repo_id}/diff")
+async def get_claude_md_diff(repo_id: int):
+    """Compare the existing CLAUDE.md on GitHub with a newly generated one."""
+    repo = await db.get_repo(repo_id)
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    github_token = repo.get("github_token") or settings.GITHUB_TOKEN
+    full_name = repo["full_name"]
+
+    # Fetch existing CLAUDE.md from GitHub
+    existing = ""
+    async with httpx.AsyncClient() as client:
+        headers = {
+            "Accept": "application/vnd.github.v3.raw",
+            "Authorization": f"Bearer {github_token}",
+        }
+        resp = await client.get(
+            f"https://api.github.com/repos/{full_name}/contents/CLAUDE.md",
+            headers=headers,
+        )
+        if resp.status_code == 200:
+            existing = resp.text
+        elif resp.status_code != 404:
+            logger.warning(f"GitHub API returned {resp.status_code} fetching CLAUDE.md for {full_name}")
+
+    # Generate new CLAUDE.md
+    generated = await generate_claude_md(repo_id)
+
+    # Compute unified diff
+    existing_lines = existing.splitlines(keepends=True)
+    generated_lines = generated.splitlines(keepends=True)
+    diff = difflib.unified_diff(existing_lines, generated_lines, fromfile="CLAUDE.md (current)", tofile="CLAUDE.md (generated)")
+
+    diff_lines = []
+    for line in diff:
+        stripped = line.rstrip("\n")
+        if stripped.startswith("+"):
+            diff_lines.append({"type": "add", "text": stripped})
+        elif stripped.startswith("-"):
+            diff_lines.append({"type": "remove", "text": stripped})
+        else:
+            diff_lines.append({"type": "context", "text": stripped})
+
+    return {
+        "existing": existing,
+        "generated": generated,
+        "diff_lines": diff_lines,
+    }
+
+
+class CreatePRRequest(BaseModel):
+    content: str
+    branch_name: str = "tacit/update-claude-md"
+    commit_message: str = "Update CLAUDE.md via Tacit"
+    pr_title: str = "Update CLAUDE.md with extracted team knowledge"
+    pr_body: str = "This PR updates CLAUDE.md based on knowledge extracted by Tacit from PR reviews, CI fixes, documentation, and code analysis."
+
+
+@app.post("/api/claude-md/{repo_id}/create-pr")
+async def create_claude_md_pr(repo_id: int, body: CreatePRRequest):
+    """Create a GitHub PR with generated CLAUDE.md content."""
+    repo = await db.get_repo(repo_id)
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    token = repo.get("github_token") or settings.GITHUB_TOKEN
+    if not token:
+        raise HTTPException(status_code=400, detail="GitHub token required for PR creation")
+
+    full_name = repo["full_name"]
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+
+    import base64
+
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        # 1. Get default branch
+        repo_resp = await client.get(
+            f"https://api.github.com/repos/{full_name}",
+            headers=headers, timeout=15,
+        )
+        if repo_resp.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"GitHub API error: {repo_resp.status_code}")
+        default_branch = repo_resp.json().get("default_branch", "main")
+
+        # 2. Get default branch SHA
+        ref_resp = await client.get(
+            f"https://api.github.com/repos/{full_name}/git/ref/heads/{default_branch}",
+            headers=headers, timeout=15,
+        )
+        if ref_resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="Could not get branch SHA")
+        base_sha = ref_resp.json()["object"]["sha"]
+
+        # 3. Create branch
+        branch_ref = f"refs/heads/{body.branch_name}"
+        create_ref_resp = await client.post(
+            f"https://api.github.com/repos/{full_name}/git/refs",
+            headers=headers, timeout=15,
+            json={"ref": branch_ref, "sha": base_sha},
+        )
+        if create_ref_resp.status_code not in (201, 422):  # 422 = branch exists
+            raise HTTPException(status_code=502, detail=f"Could not create branch: {create_ref_resp.text}")
+
+        # 4. Check if CLAUDE.md exists (to get its SHA for update)
+        file_sha = None
+        existing_resp = await client.get(
+            f"https://api.github.com/repos/{full_name}/contents/CLAUDE.md",
+            headers=headers, timeout=15,
+            params={"ref": body.branch_name},
+        )
+        if existing_resp.status_code == 200:
+            file_sha = existing_resp.json().get("sha")
+
+        # 5. Create/update CLAUDE.md
+        content_b64 = base64.b64encode(body.content.encode()).decode()
+        put_body: dict = {
+            "message": body.commit_message,
+            "content": content_b64,
+            "branch": body.branch_name,
+        }
+        if file_sha:
+            put_body["sha"] = file_sha
+
+        put_resp = await client.put(
+            f"https://api.github.com/repos/{full_name}/contents/CLAUDE.md",
+            headers=headers, timeout=15,
+            json=put_body,
+        )
+        if put_resp.status_code not in (200, 201):
+            raise HTTPException(status_code=502, detail=f"Could not commit file: {put_resp.text}")
+
+        # 6. Create PR
+        pr_resp = await client.post(
+            f"https://api.github.com/repos/{full_name}/pulls",
+            headers=headers, timeout=15,
+            json={
+                "title": body.pr_title,
+                "body": body.pr_body,
+                "head": body.branch_name,
+                "base": default_branch,
+            },
+        )
+        if pr_resp.status_code != 201:
+            raise HTTPException(status_code=502, detail=f"Could not create PR: {pr_resp.text}")
+
+        pr_data = pr_resp.json()
+        return {
+            "pr_url": pr_data["html_url"],
+            "pr_number": pr_data["number"],
+            "branch_name": body.branch_name,
+        }
+
+
 # --------------- Local Extraction ---------------
 
 @app.post("/api/local-extract")
@@ -292,6 +523,81 @@ async def local_extract(body: LocalExtractRequest):
         events.append(event.model_dump())
         await broadcast_event(event)
     return {"events": events}
+
+
+# --------------- Webhook ---------------
+
+class WebhookPayload(BaseModel):
+    class Config:
+        extra = "allow"
+
+
+@app.post("/api/webhook/github")
+async def github_webhook(request: Request):
+    """Handle GitHub webhook events for continuous learning."""
+    import hmac
+    import hashlib
+
+    # Optional HMAC verification
+    webhook_secret = settings.WEBHOOK_SECRET
+    if webhook_secret:
+        signature = request.headers.get("X-Hub-Signature-256", "")
+        body_bytes = await request.body()
+        expected = "sha256=" + hmac.new(
+            webhook_secret.encode(), body_bytes, hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            raise HTTPException(status_code=403, detail="Invalid webhook signature")
+        payload = json.loads(body_bytes)
+    else:
+        payload = await request.json()
+
+    # Only handle merged pull requests
+    action = payload.get("action")
+    pr = payload.get("pull_request", {})
+    if action != "closed" or not pr.get("merged"):
+        return {"ignored": True, "reason": "Not a merged PR event"}
+
+    # Look up repo
+    repo_full_name = payload.get("repository", {}).get("full_name", "")
+    repos = await db.list_repos()
+    repo_record = None
+    for r in repos:
+        if r["full_name"] == repo_full_name:
+            repo_record = r
+            break
+
+    if not repo_record:
+        return {"ignored": True, "reason": "Repo not tracked"}
+
+    pr_number = pr.get("number")
+    token = repo_record.get("github_token") or settings.GITHUB_TOKEN
+
+    # Run single PR extraction in background
+    asyncio.create_task(
+        _webhook_extraction_background(repo_full_name, pr_number, token)
+    )
+
+    return {"accepted": True, "pr_number": pr_number, "repo": repo_full_name}
+
+
+async def _webhook_extraction_background(repo: str, pr_number: int, token: str):
+    """Run single PR extraction from webhook and broadcast events."""
+    try:
+        new_count = await run_single_pr_extraction(repo, pr_number, token)
+        await broadcast_event(ExtractionEvent(
+            event_type="progress",
+            stage="webhook",
+            message=f"Webhook: {new_count} new proposals from PR #{pr_number} in {repo}",
+            data={"pr_number": pr_number, "new_proposals": new_count},
+        ))
+    except Exception as e:
+        logger.exception(f"Webhook extraction error: {e}")
+        await broadcast_event(ExtractionEvent(
+            event_type="error",
+            stage="webhook",
+            message=f"Webhook extraction failed for PR #{pr_number}: {str(e)}",
+        ))
 
 
 # --------------- Team Members ---------------
@@ -373,6 +679,107 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         connected_clients.discard(websocket)
         logger.info(f"WebSocket client disconnected. Total: {len(connected_clients)}")
+
+
+# --------------- PR Validation ---------------
+
+@app.post("/api/validate-pr")
+async def validate_pr(body: PRValidationRequest):
+    """Validate a PR against knowledge rules."""
+    # Find repo
+    repos = await db.list_repos()
+    repo_record = None
+    for r in repos:
+        if r["full_name"] == body.repo:
+            repo_record = r
+            break
+
+    repo_id = repo_record["id"] if repo_record else None
+
+    # Check if there are any rules to validate against
+    existing_rules = await db.list_rules(repo_id=repo_id)
+    if not existing_rules:
+        return PRValidationResult(
+            violations=[],
+            total=0,
+            files_checked=0,
+        )
+
+    # Run pr-validator agent
+    from pipeline import _run_agent
+    validator_prompt = (
+        f"Validate PR #{body.pr_number} in repository '{body.repo}' against knowledge rules. "
+        f"Use github_fetch_pr_diff with repo='{body.repo}', pr_number={body.pr_number}, github_token='{body.github_token}'. "
+        f"Use list_all_knowledge with repo_id={repo_id} to get all rules. "
+        f"Return a JSON array of violations."
+    )
+    result_text = await _run_agent("pr-validator", validator_prompt, repo_id)
+
+    # Parse violations from agent output
+    violations = []
+    try:
+        import re as _re
+        # Find JSON array in the output
+        match = _re.search(r'\[.*\]', result_text, _re.DOTALL)
+        if match:
+            parsed = json.loads(match.group())
+            for v in parsed:
+                violations.append(RuleViolation(
+                    rule_id=v.get("rule_id", 0),
+                    rule_text=v.get("rule_text", ""),
+                    file=v.get("file", ""),
+                    reason=v.get("reason", ""),
+                ))
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.warning(f"Could not parse validation result: {e}")
+
+    return PRValidationResult(
+        violations=violations,
+        total=len(violations),
+        files_checked=0,
+    )
+
+
+@app.post("/api/validate-pr/post-review")
+async def post_pr_review(body: dict):
+    """Post validation results as a GitHub PR review comment."""
+    repo = body.get("repo", "")
+    pr_number = body.get("pr_number", 0)
+    token = body.get("github_token", "")
+    violations = body.get("violations", [])
+
+    if not violations:
+        return {"message": "No violations to post"}
+
+    # Format review body
+    review_body = "## Tacit Knowledge Review\n\n"
+    review_body += f"Found **{len(violations)}** potential rule violation(s):\n\n"
+    for v in violations:
+        review_body += f"- **{v.get('file', 'unknown')}**: {v.get('reason', '')}\n"
+        review_body += f"  - Rule: _{v.get('rule_text', '')}_\n\n"
+
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        resp = await client.post(
+            f"https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews",
+            headers=headers, timeout=15,
+            json={
+                "body": review_body,
+                "event": "COMMENT",
+            },
+        )
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"GitHub API error: {resp.status_code}")
+
+        review_data = resp.json()
+        return {
+            "review_id": review_data.get("id"),
+            "review_url": review_data.get("html_url", ""),
+        }
 
 
 # --------------- Health ---------------
