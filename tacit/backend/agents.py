@@ -27,17 +27,35 @@ def get_agent_definitions() -> dict[str, AgentDefinition]:
             model="opus",
             tools=["github_fetch_comments", "search_knowledge", "store_knowledge"],
         ),
+        "structural-analyzer": AgentDefinition(
+            description="Extracts conventions from repo tree, commit messages, and branch policies",
+            prompt=_load_prompt("structural_analyzer.md"),
+            model="sonnet",
+            tools=["github_fetch_repo_structure", "store_knowledge", "search_knowledge"],
+        ),
+        "docs-analyzer": AgentDefinition(
+            description="Extracts conventions from CONTRIBUTING.md, README, and existing CLAUDE.md",
+            prompt=_load_prompt("docs_analyzer.md"),
+            model="sonnet",
+            tools=["github_fetch_docs", "store_knowledge", "search_knowledge"],
+        ),
+        "ci-failure-miner": AgentDefinition(
+            description="Mines CI failure-to-fix patterns to discover implicit conventions",
+            prompt=_load_prompt("ci_failure_miner.md"),
+            model="opus",
+            tools=["github_fetch_ci_fixes", "store_knowledge", "search_knowledge"],
+        ),
         "synthesizer": AgentDefinition(
-            description="Cross-PR synthesis: merges, deduplicates, and refines extracted rules",
+            description="Cross-source synthesis: merges, deduplicates, boosts, and refines extracted rules",
             prompt=_load_prompt("synthesizer.md"),
             model="opus",
-            tools=["search_knowledge", "store_knowledge"],
+            tools=["list_all_knowledge", "search_knowledge", "store_knowledge", "delete_knowledge"],
         ),
         "generator": AgentDefinition(
             description="Generates a well-structured CLAUDE.md file from the knowledge base",
             prompt=_load_prompt("generator.md"),
             model="opus",
-            tools=["search_knowledge"],
+            tools=["list_all_knowledge", "search_knowledge"],
         ),
         "local-extractor": AgentDefinition(
             description="Extracts knowledge from local Claude Code conversation logs",

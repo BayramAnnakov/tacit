@@ -1,7 +1,8 @@
 """MCP tools for the extraction pipeline using Claude Agent SDK @tool decorator."""
 
 import json
-import glob as globlib
+import re
+from collections import Counter
 from pathlib import Path
 
 import httpx
@@ -10,11 +11,18 @@ from claude_agent_sdk import tool, create_sdk_mcp_server
 import database as db
 
 
+def _gh_headers(token: str) -> dict:
+    return {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+
+
 # --------------- GitHub Tools ---------------
 
 @tool(
     name="github_fetch_prs",
-    description="Fetch pull requests from a GitHub repository. Returns PR metadata including title, number, author, labels, and comment counts.",
+    description="Fetch pull requests from a GitHub repository. Returns PR metadata including title, number, author, labels, comment counts, review states, and first-timer flags.",
     input_schema={
         "type": "object",
         "properties": {
@@ -31,11 +39,7 @@ async def github_fetch_prs(args: dict) -> dict:
     state = args.get("state", "closed")
     per_page = min(args.get("per_page", 30), 100)
     token = args["github_token"]
-
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json",
-    }
+    headers = _gh_headers(token)
 
     async with httpx.AsyncClient(follow_redirects=True) as client:
         resp = await client.get(
@@ -51,18 +55,45 @@ async def github_fetch_prs(args: dict) -> dict:
             }
 
         prs = resp.json()
+
+        # Count author PR frequency to detect first-timers
+        author_counts: Counter = Counter()
+        for pr in prs:
+            author_counts[pr["user"]["login"]] += 1
+
+        # Fetch review states for each PR (batch — only for PRs with comments)
+        review_states: dict[int, list[str]] = {}
+        for pr in prs:
+            pr_num = pr["number"]
+            if pr.get("review_comments", 0) > 0 or pr.get("comments", 0) > 0:
+                rev_resp = await client.get(
+                    f"https://api.github.com/repos/{repo}/pulls/{pr_num}/reviews",
+                    headers=headers,
+                    params={"per_page": 10},
+                    timeout=15,
+                )
+                if rev_resp.status_code == 200:
+                    review_states[pr_num] = [r["state"] for r in rev_resp.json()]
+
         summary = []
         for pr in prs:
+            author = pr["user"]["login"]
+            pr_num = pr["number"]
+            states = review_states.get(pr_num, [])
             summary.append({
-                "number": pr["number"],
+                "number": pr_num,
                 "title": pr["title"],
-                "author": pr["user"]["login"],
+                "author": author,
                 "state": pr["state"],
                 "comments": pr.get("comments", 0) + pr.get("review_comments", 0),
                 "labels": [l["name"] for l in pr.get("labels", [])],
                 "created_at": pr["created_at"],
                 "updated_at": pr["updated_at"],
                 "merged": pr.get("merged_at") is not None,
+                "has_changes_requested": "CHANGES_REQUESTED" in states,
+                "review_states": states,
+                "is_first_timer": author_counts[author] <= 2,
+                "changed_files": pr.get("changed_files", 0),
             })
 
     return {"content": [{"type": "text", "text": json.dumps(summary, indent=2)}]}
@@ -147,6 +178,311 @@ async def github_fetch_comments(args: dict) -> dict:
     all_comments.sort(key=lambda c: c.get("created_at", ""))
 
     return {"content": [{"type": "text", "text": json.dumps(all_comments, indent=2)}]}
+
+
+# --------------- Structural Analysis Tools ---------------
+
+@tool(
+    name="github_fetch_repo_structure",
+    description="Fetch repo tree, recent commits, and branch rulesets in ~6 API calls. Returns file paths (naming conventions, test layout, tooling), commit message patterns, and enforced branch policies.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "repo": {"type": "string", "description": "Full repo name e.g. 'owner/repo'"},
+            "github_token": {"type": "string", "description": "GitHub API token"},
+        },
+        "required": ["repo", "github_token"],
+    },
+)
+async def github_fetch_repo_structure(args: dict) -> dict:
+    repo = args["repo"]
+    token = args["github_token"]
+    headers = _gh_headers(token)
+    result: dict = {"tree": [], "commits": [], "rulesets": [], "errors": []}
+
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        # 1. Get default branch SHA
+        repo_resp = await client.get(
+            f"https://api.github.com/repos/{repo}",
+            headers=headers, timeout=15,
+        )
+        if repo_resp.status_code != 200:
+            return {"content": [{"type": "text", "text": f"GitHub API error {repo_resp.status_code}: {repo_resp.text}"}], "is_error": True}
+        default_branch = repo_resp.json().get("default_branch", "main")
+
+        # 2. Fetch recursive tree
+        tree_resp = await client.get(
+            f"https://api.github.com/repos/{repo}/git/trees/{default_branch}",
+            params={"recursive": "1"},
+            headers=headers, timeout=30,
+        )
+        if tree_resp.status_code == 200:
+            tree_data = tree_resp.json()
+            # Return only paths (skip blob content), limit to 2000 entries
+            paths = [item["path"] for item in tree_data.get("tree", []) if item["type"] in ("blob", "tree")]
+            result["tree"] = paths[:2000]
+            result["tree_truncated"] = tree_data.get("truncated", False)
+        else:
+            result["errors"].append(f"Tree fetch failed: {tree_resp.status_code}")
+
+        # 3. Fetch recent commits (30)
+        commits_resp = await client.get(
+            f"https://api.github.com/repos/{repo}/commits",
+            params={"per_page": 30, "sha": default_branch},
+            headers=headers, timeout=15,
+        )
+        if commits_resp.status_code == 200:
+            for c in commits_resp.json():
+                msg = c["commit"]["message"]
+                result["commits"].append({
+                    "sha": c["sha"][:8],
+                    "message": msg[:200],
+                    "author": c["commit"]["author"]["name"],
+                    "date": c["commit"]["author"]["date"],
+                    "is_merge": msg.startswith("Merge "),
+                })
+        else:
+            result["errors"].append(f"Commits fetch failed: {commits_resp.status_code}")
+
+        # 4. Fetch branch rulesets (may require admin, gracefully degrade)
+        rulesets_resp = await client.get(
+            f"https://api.github.com/repos/{repo}/rulesets",
+            headers=headers, timeout=15,
+        )
+        if rulesets_resp.status_code == 200:
+            for rs in rulesets_resp.json():
+                result["rulesets"].append({
+                    "name": rs.get("name"),
+                    "enforcement": rs.get("enforcement"),
+                    "target": rs.get("target"),
+                    "rules": [r.get("type") for r in rs.get("rules", [])],
+                })
+        # Fallback: try branch protection (older API)
+        elif rulesets_resp.status_code in (404, 403):
+            bp_resp = await client.get(
+                f"https://api.github.com/repos/{repo}/branches/{default_branch}/protection",
+                headers=headers, timeout=15,
+            )
+            if bp_resp.status_code == 200:
+                bp = bp_resp.json()
+                protection = {}
+                if bp.get("required_status_checks"):
+                    protection["required_checks"] = bp["required_status_checks"].get("contexts", [])
+                    protection["strict"] = bp["required_status_checks"].get("strict", False)
+                if bp.get("required_pull_request_reviews"):
+                    protection["required_approvals"] = bp["required_pull_request_reviews"].get("required_approving_review_count", 0)
+                    protection["code_owners_required"] = bp["required_pull_request_reviews"].get("require_code_owner_reviews", False)
+                if bp.get("required_linear_history"):
+                    protection["linear_history"] = bp["required_linear_history"].get("enabled", False)
+                if protection:
+                    result["rulesets"].append({"type": "branch_protection", **protection})
+
+    return {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]}
+
+
+@tool(
+    name="github_fetch_docs",
+    description="Fetch CONTRIBUTING.md, README.md (setup sections only), and any existing CLAUDE.md/AGENTS.md from a repo. Pre-filters README to development-relevant sections.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "repo": {"type": "string", "description": "Full repo name e.g. 'owner/repo'"},
+            "github_token": {"type": "string", "description": "GitHub API token"},
+        },
+        "required": ["repo", "github_token"],
+    },
+)
+async def github_fetch_docs(args: dict) -> dict:
+    repo = args["repo"]
+    token = args["github_token"]
+    headers = _gh_headers(token)
+    headers["Accept"] = "application/vnd.github.v3.raw"
+
+    doc_files = [
+        "CONTRIBUTING.md",
+        "contributing.md",
+        "CLAUDE.md",
+        ".claude/CLAUDE.md",
+        "AGENTS.md",
+        "README.md",
+        "docs/CONTRIBUTING.md",
+        "docs/contributing.md",
+        ".github/CONTRIBUTING.md",
+    ]
+
+    result: dict = {}
+    setup_keywords = re.compile(
+        r"(setup|install|develop|getting.started|contributing|prerequisit|build|quick.start|usage|requirements)",
+        re.IGNORECASE,
+    )
+
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        for filepath in doc_files:
+            resp = await client.get(
+                f"https://api.github.com/repos/{repo}/contents/{filepath}",
+                headers=headers, timeout=15,
+            )
+            if resp.status_code != 200:
+                continue
+
+            content = resp.text
+            name = filepath.split("/")[-1].upper()
+
+            # For README.md, extract only dev-relevant sections
+            if name == "README.MD":
+                sections = _extract_relevant_sections(content, setup_keywords)
+                if sections:
+                    result[filepath] = sections
+            else:
+                # Full content for CONTRIBUTING, CLAUDE, AGENTS
+                result[filepath] = content[:15000]  # Cap at 15k chars
+
+    if not result:
+        return {"content": [{"type": "text", "text": "No contributing/setup documentation found in this repository."}]}
+
+    return {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]}
+
+
+def _extract_relevant_sections(markdown: str, pattern: re.Pattern) -> str:
+    """Extract markdown sections whose headings match the pattern."""
+    lines = markdown.split("\n")
+    sections: list[str] = []
+    capturing = False
+    current_level = 0
+
+    for line in lines:
+        heading_match = re.match(r"^(#{1,4})\s+(.+)", line)
+        if heading_match:
+            level = len(heading_match.group(1))
+            title = heading_match.group(2)
+            if pattern.search(title):
+                capturing = True
+                current_level = level
+                sections.append(line)
+            elif capturing and level <= current_level:
+                capturing = False
+            elif capturing:
+                sections.append(line)
+        elif capturing:
+            sections.append(line)
+
+    return "\n".join(sections)[:10000]
+
+
+@tool(
+    name="github_fetch_ci_fixes",
+    description="Mine CI failure→fix patterns from recent PRs. Finds PRs where CI checks failed then passed, and returns the fix commit diffs that reveal implicit conventions.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "repo": {"type": "string", "description": "Full repo name e.g. 'owner/repo'"},
+            "github_token": {"type": "string", "description": "GitHub API token"},
+            "max_prs": {"type": "integer", "description": "Max PRs to scan (default 30)", "default": 30},
+        },
+        "required": ["repo", "github_token"],
+    },
+)
+async def github_fetch_ci_fixes(args: dict) -> dict:
+    repo = args["repo"]
+    token = args["github_token"]
+    max_prs = min(args.get("max_prs", 30), 50)
+    headers = _gh_headers(token)
+
+    ci_fixes: list[dict] = []
+
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        # Fetch recent merged PRs
+        pr_resp = await client.get(
+            f"https://api.github.com/repos/{repo}/pulls",
+            params={"state": "closed", "per_page": max_prs, "sort": "updated", "direction": "desc"},
+            headers=headers, timeout=30,
+        )
+        if pr_resp.status_code != 200:
+            return {"content": [{"type": "text", "text": f"GitHub API error {pr_resp.status_code}: {pr_resp.text}"}], "is_error": True}
+
+        prs = [p for p in pr_resp.json() if p.get("merged_at")]
+
+        for pr in prs[:max_prs]:
+            pr_num = pr["number"]
+
+            # Fetch commits for this PR
+            commits_resp = await client.get(
+                f"https://api.github.com/repos/{repo}/pulls/{pr_num}/commits",
+                headers=headers, timeout=15,
+            )
+            if commits_resp.status_code != 200:
+                continue
+            commits = commits_resp.json()
+            if len(commits) < 2:
+                continue  # Need at least 2 commits to see a fix pattern
+
+            # Check for CI failures on earlier commits
+            found_failure = False
+            failed_check_name = ""
+            fix_commit_sha = ""
+
+            for i, commit in enumerate(commits):
+                sha = commit["sha"]
+                checks_resp = await client.get(
+                    f"https://api.github.com/repos/{repo}/commits/{sha}/check-runs",
+                    headers=headers,
+                    params={"per_page": 20},
+                    timeout=15,
+                )
+                if checks_resp.status_code != 200:
+                    continue
+
+                runs = checks_resp.json().get("check_runs", [])
+                failed_checks = [r for r in runs if r.get("conclusion") == "failure"]
+
+                if failed_checks and not found_failure:
+                    found_failure = True
+                    failed_check_name = failed_checks[0].get("name", "unknown")
+                elif found_failure and i > 0:
+                    # This commit came after a failure — check if it passed
+                    passed = [r for r in runs if r.get("conclusion") == "success" and r.get("name") == failed_check_name]
+                    if passed:
+                        fix_commit_sha = sha
+                        break
+
+            if not fix_commit_sha:
+                continue
+
+            # Fetch the fix commit diff
+            diff_resp = await client.get(
+                f"https://api.github.com/repos/{repo}/commits/{fix_commit_sha}",
+                headers=headers, timeout=15,
+            )
+            if diff_resp.status_code != 200:
+                continue
+
+            commit_data = diff_resp.json()
+            files_changed = []
+            for f in commit_data.get("files", [])[:10]:
+                files_changed.append({
+                    "filename": f["filename"],
+                    "status": f["status"],
+                    "patch": (f.get("patch") or "")[:500],
+                })
+
+            ci_fixes.append({
+                "pr_number": pr_num,
+                "pr_title": pr["title"],
+                "failed_check": failed_check_name,
+                "fix_commit_sha": fix_commit_sha[:8],
+                "fix_commit_message": commit_data["commit"]["message"][:200],
+                "files_changed": files_changed,
+                "author": pr["user"]["login"],
+            })
+
+            # Limit to 10 CI fix patterns to avoid excessive API calls
+            if len(ci_fixes) >= 10:
+                break
+
+    if not ci_fixes:
+        return {"content": [{"type": "text", "text": "No CI failure→fix patterns found in recent PRs."}]}
+
+    return {"content": [{"type": "text", "text": json.dumps(ci_fixes, indent=2)}]}
 
 
 # --------------- Local Log Tools ---------------
@@ -274,6 +610,45 @@ async def search_knowledge(args: dict) -> dict:
     return {"content": [{"type": "text", "text": json.dumps(results, default=str)}]}
 
 
+@tool(
+    name="list_all_knowledge",
+    description="List ALL knowledge rules for a repository. Use this to get a complete view of all rules for deduplication and synthesis. Returns rules sorted by confidence (highest first).",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "repo_id": {"type": "integer", "description": "Repository ID to list rules for"},
+            "category": {"type": "string", "description": "Filter by category (optional)"},
+        },
+        "required": [],
+    },
+)
+async def list_all_knowledge(args: dict) -> dict:
+    results = await db.list_rules(
+        category=args.get("category"),
+        repo_id=args.get("repo_id"),
+    )
+    return {"content": [{"type": "text", "text": json.dumps(results, default=str)}]}
+
+
+@tool(
+    name="delete_knowledge",
+    description="Delete a knowledge rule by its ID. Use this during synthesis to remove duplicate or low-quality rules after merging them into a better version.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "rule_id": {"type": "integer", "description": "ID of the rule to delete"},
+        },
+        "required": ["rule_id"],
+    },
+)
+async def delete_knowledge(args: dict) -> dict:
+    rule_id = args["rule_id"]
+    success = await db.delete_rule(rule_id)
+    if success:
+        return {"content": [{"type": "text", "text": f"Rule {rule_id} deleted successfully."}]}
+    return {"content": [{"type": "text", "text": f"Rule {rule_id} not found."}], "is_error": True}
+
+
 # --------------- Create the MCP Server ---------------
 
 SERVER_NAME = "tacit_tools"
@@ -287,9 +662,14 @@ def create_tacit_tools_server():
         tools=[
             github_fetch_prs,
             github_fetch_comments,
+            github_fetch_repo_structure,
+            github_fetch_docs,
+            github_fetch_ci_fixes,
             read_claude_logs,
             store_knowledge,
             search_knowledge,
+            list_all_knowledge,
+            delete_knowledge,
         ],
     )
 
@@ -298,9 +678,14 @@ def create_tacit_tools_server():
 _RAW_TOOL_NAMES = [
     "github_fetch_prs",
     "github_fetch_comments",
+    "github_fetch_repo_structure",
+    "github_fetch_docs",
+    "github_fetch_ci_fixes",
     "read_claude_logs",
     "store_knowledge",
     "search_knowledge",
+    "list_all_knowledge",
+    "delete_knowledge",
 ]
 
 # MCP-prefixed tool names for allowed_tools

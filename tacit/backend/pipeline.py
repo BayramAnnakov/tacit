@@ -1,5 +1,6 @@
 """Extraction pipeline orchestrator using Claude Agent SDK."""
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -60,12 +61,13 @@ async def _run_agent(
 
 
 async def run_extraction(repo: str, github_token: str) -> AsyncIterator[ExtractionEvent]:
-    """Orchestrate the 4-pass extraction pipeline.
+    """Orchestrate the multi-source extraction pipeline.
 
-    Pass 1: PR Scanner - identify knowledge-rich PRs
-    Pass 2: Thread Analyzer - extract rules from each PR
-    Pass 3: Synthesizer - merge and deduplicate rules
-    Pass 4: (optional) Generator can be called separately via /api/claude-md
+    Phase 1: Parallel data gathering (structural, docs, CI fixes)
+    Phase 2: PR analysis (scanner → thread analyzer per PR)
+    Phase 3: Await parallel tasks
+    Phase 4: Synthesize across ALL sources
+    Phase 5: (optional) Generator can be called separately via /api/claude-md
 
     Yields ExtractionEvent objects for real-time streaming to the frontend.
     """
@@ -86,7 +88,33 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
     run_id = run["id"]
 
     try:
-        # --- Pass 1: Scan PRs ---
+        # === Phase 1: Launch parallel analyzers ===
+        yield ExtractionEvent(
+            event_type="stage_change",
+            stage="repo_analysis",
+            message=f"Analyzing repository structure, docs, and CI patterns for {repo}...",
+        )
+        await db.update_extraction_run(run_id, stage="repo_analysis")
+
+        # Launch structural, docs, and CI analysis in parallel
+        structural_task = asyncio.create_task(
+            _run_structural_analysis(repo, github_token, repo_id)
+        )
+        docs_task = asyncio.create_task(
+            _run_docs_analysis(repo, github_token, repo_id)
+        )
+        ci_fixes_task = asyncio.create_task(
+            _run_ci_failure_mining(repo, github_token, repo_id)
+        )
+
+        yield ExtractionEvent(
+            event_type="progress",
+            stage="repo_analysis",
+            message="Launched parallel analysis: repo structure, docs, CI failures",
+            data={"parallel_tasks": ["structural", "docs", "ci_fixes"]},
+        )
+
+        # === Phase 2: PR analysis (sequential, existing flow) ===
         yield ExtractionEvent(
             event_type="stage_change",
             stage="scanning",
@@ -96,29 +124,14 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
 
         scanner_prompt = (
             f"Scan the GitHub repository '{repo}' for knowledge-rich pull requests. "
-            f"Use the github_fetch_prs tool with github_token='{github_token}' and repo='{repo}'. "
+            f"Use the github_fetch_prs tool with github_token='{github_token}', repo='{repo}', per_page=50. "
+            f"Prioritize first-timer PRs and PRs with CHANGES_REQUESTED reviews. "
             f"Return the top 10 most promising PRs as JSON."
         )
         scanner_result = await _run_agent("pr-scanner", scanner_prompt, repo_id)
 
         # Parse PR numbers from scanner output
-        pr_numbers = []
-        try:
-            # Try to extract JSON from the result
-            for line in scanner_result.split("\n"):
-                line = line.strip()
-                if line.startswith("["):
-                    data = json.loads(line)
-                    pr_numbers = [item["pr_number"] for item in data if "pr_number" in item]
-                    break
-            if not pr_numbers:
-                # Fallback: try parsing the whole result as JSON
-                data = json.loads(scanner_result)
-                if isinstance(data, list):
-                    pr_numbers = [item["pr_number"] for item in data if "pr_number" in item]
-        except (json.JSONDecodeError, KeyError):
-            logger.warning("Could not parse PR numbers from scanner output, using top 5 PRs")
-            pr_numbers = list(range(1, 6))  # Fallback
+        pr_numbers = _parse_pr_numbers(scanner_result)
 
         yield ExtractionEvent(
             event_type="progress",
@@ -127,7 +140,7 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
             data={"pr_count": len(pr_numbers)},
         )
 
-        # --- Pass 2: Analyze each PR thread ---
+        # Analyze each PR thread
         yield ExtractionEvent(
             event_type="stage_change",
             stage="analyzing",
@@ -136,7 +149,7 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
         await db.update_extraction_run(run_id, stage="analyzing")
 
         rules_found = 0
-        for i, pr_num in enumerate(pr_numbers[:10]):  # Limit to 10 PRs
+        for i, pr_num in enumerate(pr_numbers[:10]):
             yield ExtractionEvent(
                 event_type="progress",
                 stage="analyzing",
@@ -165,20 +178,62 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
 
             await db.update_extraction_run(run_id, prs_analyzed=i + 1, rules_found=rules_found)
 
-        # --- Pass 3: Synthesize ---
+        # === Phase 3: Await parallel tasks ===
+        yield ExtractionEvent(
+            event_type="progress",
+            stage="analyzing",
+            message="Waiting for parallel analysis tasks to complete...",
+        )
+
+        parallel_results = await asyncio.gather(
+            structural_task, docs_task, ci_fixes_task,
+            return_exceptions=True,
+        )
+
+        # Report parallel task results
+        task_names = ["Structural analysis", "Docs analysis", "CI failure mining"]
+        for name, result in zip(task_names, parallel_results):
+            if isinstance(result, Exception):
+                logger.warning(f"{name} failed: {result}")
+                yield ExtractionEvent(
+                    event_type="progress",
+                    stage="analyzing",
+                    message=f"{name} encountered an error (non-fatal): {str(result)[:100]}",
+                )
+            else:
+                yield ExtractionEvent(
+                    event_type="progress",
+                    stage="analyzing",
+                    message=f"{name} completed successfully",
+                )
+
+        # Update rule count after parallel tasks
+        all_rules = await db.list_rules(repo_id=repo_id)
+        rules_found = len(all_rules)
+
+        yield ExtractionEvent(
+            event_type="progress",
+            stage="analyzing",
+            message=f"All sources analyzed: {rules_found} total rules before synthesis",
+            data={"total_rules": rules_found},
+        )
+
+        # === Phase 4: Synthesize across ALL sources ===
         yield ExtractionEvent(
             event_type="stage_change",
             stage="synthesizing",
-            message="Synthesizing and deduplicating rules...",
+            message="Synthesizing rules across all sources (PRs, structure, docs, CI fixes)...",
         )
         await db.update_extraction_run(run_id, stage="synthesizing")
 
         synth_prompt = (
             f"Synthesize all knowledge rules for repo_id={repo_id}. "
-            f"Search for existing rules, merge duplicates, boost confidence for confirmed rules, "
-            f"and resolve any contradictions."
+            f"Rules come from multiple sources: pr, structure, docs, ci_fix. "
+            f"Apply cross-source prioritization (ci_fix > structure/docs > pr), "
+            f"boost confidence for rules confirmed across sources, "
+            f"merge duplicates, and remove generic/low-quality rules."
         )
-        synth_result = await _run_agent("synthesizer", synth_prompt, repo_id)
+        await _run_agent("synthesizer", synth_prompt, repo_id)
 
         final_rules = await db.list_rules(repo_id=repo_id)
         await db.update_extraction_run(
@@ -189,11 +244,21 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
             completed_at=datetime.now(timezone.utc).isoformat(),
         )
 
+        # Count rules by source type for reporting
+        source_counts: dict[str, int] = {}
+        for rule in final_rules:
+            st = rule.get("source_type", "unknown")
+            source_counts[st] = source_counts.get(st, 0) + 1
+
         yield ExtractionEvent(
             event_type="complete",
             stage="complete",
-            message=f"Extraction complete: {len(final_rules)} rules from {len(pr_numbers[:10])} PRs",
-            data={"total_rules": len(final_rules), "prs_analyzed": len(pr_numbers[:10])},
+            message=f"Extraction complete: {len(final_rules)} rules from {len(pr_numbers[:10])} PRs + structure + docs + CI fixes",
+            data={
+                "total_rules": len(final_rules),
+                "prs_analyzed": len(pr_numbers[:10]),
+                "rules_by_source": source_counts,
+            },
         )
 
     except Exception as e:
@@ -204,6 +269,59 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
             stage="error",
             message=f"Extraction failed: {str(e)}",
         )
+
+
+async def _run_structural_analysis(repo: str, github_token: str, repo_id: int) -> str:
+    """Run the structural analyzer agent."""
+    prompt = (
+        f"Analyze the structure of repository '{repo}'. "
+        f"Use github_fetch_repo_structure with repo='{repo}', github_token='{github_token}'. "
+        f"Extract conventions from the file tree, commit messages, and branch rulesets. "
+        f"Store each convention using store_knowledge with source_type='structure' and repo_id={repo_id}."
+    )
+    return await _run_agent("structural-analyzer", prompt, repo_id)
+
+
+async def _run_docs_analysis(repo: str, github_token: str, repo_id: int) -> str:
+    """Run the docs analyzer agent."""
+    prompt = (
+        f"Analyze the contributing documentation of repository '{repo}'. "
+        f"Use github_fetch_docs with repo='{repo}', github_token='{github_token}'. "
+        f"Extract conventions from CONTRIBUTING.md, README setup sections, and any CLAUDE.md/AGENTS.md. "
+        f"Store each convention using store_knowledge with source_type='docs' and repo_id={repo_id}."
+    )
+    return await _run_agent("docs-analyzer", prompt, repo_id)
+
+
+async def _run_ci_failure_mining(repo: str, github_token: str, repo_id: int) -> str:
+    """Run the CI failure miner agent."""
+    prompt = (
+        f"Mine CI failure-to-fix patterns from repository '{repo}'. "
+        f"Use github_fetch_ci_fixes with repo='{repo}', github_token='{github_token}'. "
+        f"For each CI failure that was fixed, extract the implicit convention. "
+        f"Store each convention using store_knowledge with source_type='ci_fix' and repo_id={repo_id}."
+    )
+    return await _run_agent("ci-failure-miner", prompt, repo_id)
+
+
+def _parse_pr_numbers(scanner_result: str) -> list[int]:
+    """Parse PR numbers from scanner output, with fallback."""
+    pr_numbers = []
+    try:
+        for line in scanner_result.split("\n"):
+            line = line.strip()
+            if line.startswith("["):
+                data = json.loads(line)
+                pr_numbers = [item["pr_number"] for item in data if "pr_number" in item]
+                break
+        if not pr_numbers:
+            data = json.loads(scanner_result)
+            if isinstance(data, list):
+                pr_numbers = [item["pr_number"] for item in data if "pr_number" in item]
+    except (json.JSONDecodeError, KeyError):
+        logger.warning("Could not parse PR numbers from scanner output, using top 5 PRs")
+        pr_numbers = list(range(1, 6))
+    return pr_numbers
 
 
 async def run_local_extraction(project_path: str) -> AsyncIterator[ExtractionEvent]:
@@ -245,8 +363,11 @@ async def generate_claude_md(repo_id: int) -> str:
     try:
         generator_prompt = (
             f"Generate a CLAUDE.md file from all knowledge rules with repo_id={repo_id}. "
-            f"Use search_knowledge to retrieve rules, then organize them into a well-structured markdown file. "
-            f"Only include rules with confidence >= 0.6."
+            f"Use list_all_knowledge to retrieve rules, then organize them into a well-structured "
+            f"CLAUDE.md with sections: Quick Start, Development Commands, Code Style, Testing, "
+            f"Architecture, Workflow, and Do Not. "
+            f"Only include rules with confidence >= 0.6. "
+            f"The 'Do Not' section should highlight CRITICAL prohibitions discovered from CI fixes and PR reviews."
         )
         result = await _run_agent("generator", generator_prompt, repo_id)
         if result.strip():
@@ -255,7 +376,6 @@ async def generate_claude_md(repo_id: int) -> str:
         logger.warning(f"Agent-based CLAUDE.md generation failed: {e}")
 
     # Fallback: build CLAUDE.md directly from rules in the database
-    # Include repo-specific rules AND team-wide rules (repo_id=None)
     rules = await db.list_rules(repo_id=repo_id)
     team_rules = await db.list_rules()
     seen_ids = {r["id"] for r in rules}
@@ -265,16 +385,47 @@ async def generate_claude_md(repo_id: int) -> str:
     if not rules:
         return "# CLAUDE.md\n\nNo knowledge rules extracted yet. Run an extraction first.\n"
 
-    lines = ["# CLAUDE.md\n", "Project conventions extracted by Tacit.\n"]
-    by_category: dict[str, list[dict]] = {}
+    # Map categories to the new three-tier structure
+    section_map = {
+        "workflow": "Workflow",
+        "style": "Code Style",
+        "testing": "Testing",
+        "architecture": "Architecture",
+        "security": "Security",
+        "performance": "Performance",
+        "general": "General",
+    }
+
+    lines = ["# CLAUDE.md\n"]
+
+    # Separate prohibitions for the "Do Not" section
+    do_not_rules = []
+    regular_rules: dict[str, list[dict]] = {}
+
     for rule in rules:
         if rule["confidence"] < 0.6:
             continue
-        by_category.setdefault(rule["category"], []).append(rule)
+        text = rule["rule_text"]
+        if any(kw in text.upper() for kw in ["NEVER", "DO NOT", "DON'T", "MUST NOT", "FORBIDDEN", "AVOID"]):
+            do_not_rules.append(rule)
+        else:
+            section = section_map.get(rule["category"], "General")
+            regular_rules.setdefault(section, []).append(rule)
 
-    for category, cat_rules in sorted(by_category.items()):
-        lines.append(f"\n## {category.title()}\n")
+    # Output regular sections
+    section_order = ["Quick Start", "Development Commands", "Code Style", "Testing", "Architecture", "Workflow", "Security", "Performance", "General"]
+    for section in section_order:
+        cat_rules = regular_rules.get(section, [])
+        if not cat_rules:
+            continue
+        lines.append(f"\n## {section}\n")
         for r in sorted(cat_rules, key=lambda x: -x["confidence"]):
+            lines.append(f"- {r['rule_text']}")
+
+    # Output Do Not section
+    if do_not_rules:
+        lines.append("\n## Do Not\n")
+        for r in sorted(do_not_rules, key=lambda x: -x["confidence"]):
             lines.append(f"- {r['rule_text']}")
 
     return "\n".join(lines) + "\n"

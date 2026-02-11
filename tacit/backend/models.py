@@ -39,7 +39,7 @@ class KnowledgeRule(BaseModel):
     rule_text: str
     category: str = "general"
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
-    source_type: Literal["pr", "conversation"] = "pr"
+    source_type: Literal["pr", "conversation", "structure", "docs", "ci_fix"] = "pr"
     source_ref: str = ""
     repo_id: int | None = None
     created_at: datetime | None = None

@@ -1,0 +1,8 @@
+# Project Guidelines
+
+## Architecture
+- Return structured error responses with `error_code` and `message` fields from all API endpoints — inconsistent error formats cause frontend bugs (confidence: 0.92)
+- Use `@MainActor` for all SwiftUI view models to ensure UI updates happen on the main thread and prevent threading crashes (confidence: 0.85)
+
+## Code Style
+- Prefer `async/await` over Combine publishers for new network calls — `async/await` is more readable than Combine chains for simple network requests (confidence: 0.78)

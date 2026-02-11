@@ -215,6 +215,18 @@ async def search_rules(query_text: str, category: str | None = None, repo_id: in
         await db.close()
 
 
+async def delete_rule(rule_id: int) -> bool:
+    db = await get_db()
+    try:
+        # Delete associated decision trail entries first
+        await db.execute("DELETE FROM decision_trail WHERE rule_id = ?", (rule_id,))
+        cursor = await db.execute("DELETE FROM knowledge_rules WHERE id = ?", (rule_id,))
+        await db.commit()
+        return cursor.rowcount > 0
+    finally:
+        await db.close()
+
+
 # --------------- Proposals ---------------
 
 async def create_proposal(rule_text: str, category: str, confidence: float,

@@ -1,0 +1,129 @@
+
+============================================================
+EXTRACTING: astral-sh/ruff
+============================================================
+  [STAGE CHANGE] Scanning PRs in astral-sh/ruff for knowledge-rich discussions...
+  [STAGE CHANGE] Analyzing PR discussion threads...
+  [RULE FOUND] Extracted 3 new rules from PR #22748
+  [RULE FOUND] Extracted 4 new rules from PR #23103
+  [RULE FOUND] Extracted 6 new rules from PR #22124
+  [RULE FOUND] Extracted 3 new rules from PR #23104
+  [RULE FOUND] Extracted 5 new rules from PR #23063
+  [RULE FOUND] Extracted 3 new rules from PR #22850
+  [RULE FOUND] Extracted 6 new rules from PR #23112
+  [RULE FOUND] Extracted 4 new rules from PR #22828
+  [STAGE CHANGE] Synthesizing and deduplicating rules...
+  [COMPLETE] Extraction complete: 30 rules from 10 PRs
+
+============================================================
+EXTRACTING: modelcontextprotocol/python-sdk
+============================================================
+  [STAGE CHANGE] Scanning PRs in modelcontextprotocol/python-sdk for knowledge-rich discussions...
+  [STAGE CHANGE] Analyzing PR discussion threads...
+  [RULE FOUND] Extracted 5 new rules from PR #1177
+  [RULE FOUND] Extracted 5 new rules from PR #1870
+  [RULE FOUND] Extracted 4 new rules from PR #1915
+  [RULE FOUND] Extracted 5 new rules from PR #1972
+  [RULE FOUND] Extracted 1 new rules from PR #1894
+  [RULE FOUND] Extracted 4 new rules from PR #1951
+  [RULE FOUND] Extracted 4 new rules from PR #1909
+  [RULE FOUND] Extracted 1 new rules from PR #1899
+  [RULE FOUND] Extracted 3 new rules from PR #2010
+  [STAGE CHANGE] Synthesizing and deduplicating rules...
+  [COMPLETE] Extraction complete: 29 rules from 10 PRs
+
+============================================================
+EXTRACTING: vercel/ai
+============================================================
+  [STAGE CHANGE] Scanning PRs in vercel/ai for knowledge-rich discussions...
+  [STAGE CHANGE] Analyzing PR discussion threads...
+  [RULE FOUND] Extracted 3 new rules from PR #11836
+  [RULE FOUND] Extracted 4 new rules from PR #12240
+  [RULE FOUND] Extracted 2 new rules from PR #12311
+  [RULE FOUND] Extracted 5 new rules from PR #12320
+  [RULE FOUND] Extracted 1 new rules from PR #12377
+  [RULE FOUND] Extracted 2 new rules from PR #12188
+  [RULE FOUND] Extracted 3 new rules from PR #12197
+  [STAGE CHANGE] Synthesizing and deduplicating rules...
+WARNING:asyncio:Unknown child process pid 40870, will report returncode 255
+  [COMPLETE] Extraction complete: 14 rules from 10 PRs
+
+============================================================
+EXTRACTION COMPLETE — SUMMARY
+============================================================
+  astral-sh/ruff: 30 rules
+    [architecture] (conf=0.92) When identical or near-identical logic appears in multiple code branches, AST ex
+    [style       ] (conf=0.88) Maintain TODO comment quality: remove TODO comments that are inaccurate, mislead
+    [architecture] (conf=0.88) When designing internal APIs in Rust, functions should accept the narrowest/most
+    [architecture] (conf=0.88) When implementing type-checking rules for constrained TypeVars, require equivale
+    [style       ] (conf=0.85) In Rust code, prefer `let` chains (chained `if let ... && let ...` patterns) ove
+    [style       ] (conf=0.85) Prefer `.expect("reason")` over silent `None`/`Option` fallbacks when a code pat
+    [architecture] (conf=0.85) When adding new type system semantics, do not reuse an existing type variant (e.
+    [architecture] (conf=0.83) Airflow linter rules that check context key usage must handle all access pattern
+    [architecture] (conf=0.82) When checking if a class inherits from a specific base class in ruff lint rules,
+    [style       ] (conf=0.82) Pycon (```` ```pycon ````) code block formatting in markdown should be consisten
+    [architecture] (conf=0.82) In the ruff LSP server (ruff_server), when encountering unsupported source types
+    [workflow    ] (conf=0.82) When a code change introduces new true-positive diagnostics that increase the di
+    [testing     ] (conf=0.82) In mdtest files (Markdown-based type checker tests), always include both success
+    [architecture] (conf=0.82) When designing type-checking behavior, implement rules that will remain sound af
+    [architecture] (conf=0.82) Internal marker types used during type inference (e.g., markers representing uns
+    [architecture] (conf=0.80) When writing lint rules that check method signatures for deprecation or migratio
+    [style       ] (conf=0.80) When using literal numeric offsets (e.g., `TextSize::new(4)`), prefer using a na
+    [style       ] (conf=0.80) When writing deprecation or removal diagnostic messages in Airflow linter rules,
+    [architecture] (conf=0.80) In the ruff LSP server, Markdown files should be included for formatting request
+    [style       ] (conf=0.78) When two narrowing or matching branches are mutually exclusive (e.g., TypedDict-
+    [style       ] (conf=0.75) When writing helper functions that accept a callback/predicate for matching clas
+    [style       ] (conf=0.75) Use existing helper methods on types (e.g., `Line::full_range()`) instead of man
+    [style       ] (conf=0.75) Use `TextSize::ZERO` instead of `TextSize::new(0)` when initializing a zero-valu
+    [style       ] (conf=0.75) In Rust, when checking an Option and the inner value is not used, prefer `.is_so
+    [workflow    ] (conf=0.73) For PRs that involve UI-facing or editor-facing changes (e.g., LSP server behavi
+    [workflow    ] (conf=0.73) In mdtest documentation and code comments, avoid adding parenthetical notes abou
+    [style       ] (conf=0.72) When iterating with a `Peekable` iterator and conditionally advancing based on a
+    [workflow    ] (conf=0.72) When submitting large refactors for review, break the work into transitory/inter
+    [performance ] (conf=0.72) When CodSpeed reports performance regressions on benchmarks like `colour_science
+    [performance ] (conf=0.70) When a function returns `Option<String>` where `None` means "no changes", prefer
+  modelcontextprotocol/python-sdk: 29 rules
+    [architecture] (conf=0.95) When a framework allows users to register synchronous (non-async) functions as h
+    [testing     ] (conf=0.92) Do not use `Test`-prefixed classes in tests. Write tests as standalone async fun
+    [architecture] (conf=0.90) Modules prefixed with an underscore (e.g., `_memory.py`, `_transport.py`) are in
+    [workflow    ] (conf=0.83) When refactoring removes the need for a type alias or callback type (e.g., `GetS
+    [architecture] (conf=0.83) Modules that are only intended for internal or test use (not part of the public 
+    [architecture] (conf=0.82) When performing major renames or breaking changes, do not provide backwards-comp
+    [architecture] (conf=0.82) When a callback or abstraction breaks a protocol/interface contract (e.g., a cal
+    [workflow    ] (conf=0.82) CI and test tooling scripts (e.g., conformance test clients) should not be place
+    [style       ] (conf=0.82) Code examples in docstrings must be self-contained with all necessary imports in
+    [style       ] (conf=0.82) Do not expose private/internal methods (prefixed with `_`) in examples or public
+    [style       ] (conf=0.80) Do not silently swallow exceptions with bare `except: pass` or `except SomeError
+    [architecture] (conf=0.80) Do not add `@runtime_checkable` to Protocol classes unless there is a concrete, 
+    [workflow    ] (conf=0.80) When adding external tool dependencies in CI workflows (e.g., npx packages in Gi
+    [workflow    ] (conf=0.80) Do not document or expose features (e.g., advanced APIs, low-level access) in pu
+    [style       ] (conf=0.80) When accepting an HTTP client parameter, name it `http_client` (generic) rather 
+    [testing     ] (conf=0.78) Use snapshot testing (e.g., `inline_snapshot`) for test assertions instead of ma
+    [workflow    ] (conf=0.78) Do not add migration guide entries for internal or non-public classes/APIs. Migr
+    [style       ] (conf=0.78) When writing migration documentation that shows "Before" and "After" code exampl
+    [architecture] (conf=0.78) When a user provides a pre-configured object (e.g., an HTTP client), follow the 
+    [workflow    ] (conf=0.77) When renaming a core class or changing environment variable prefixes (e.g., FAST
+    [style       ] (conf=0.75) Use correct English grammar for articles before acronyms based on pronunciation,
+    [style       ] (conf=0.75) Use snake_case (not camelCase) for attribute names in Python type definitions an
+    [style       ] (conf=0.75) Prefer `@dataclass` over manual `__init__` methods for classes with many paramet
+    [style       ] (conf=0.75) When using `asyncio.run()` as the top-level entry point, do not wrap it in a try
+    [style       ] (conf=0.75) Avoid using the `get_` prefix on Python properties and accessor methods. Prefer 
+    [workflow    ] (conf=0.75) When deprecating a function or API, batch related parameter changes together rat
+    [architecture] (conf=0.73) Avoid duplicating script files across directories (e.g., having the same conform
+    [style       ] (conf=0.72) When passing keyword arguments to `anyio.to_thread.run_sync()`, use `functools.p
+    [style       ] (conf=0.72) Use comments (# ...) rather than docstrings (triple-quoted strings) for TODO blo
+  vercel/ai: 14 rules
+    [workflow    ] (conf=0.95) When creating a changeset for a brand-new package (initial release), use a `majo
+    [workflow    ] (conf=0.88) When changes are isolated to a new package with no modifications to existing pub
+    [architecture] (conf=0.82) When designing telemetry or event data interfaces, each event type should be pro
+    [architecture] (conf=0.80) When adding new model type methods to the gateway provider (e.g., `videoModel`, 
+    [style       ] (conf=0.80) Avoid using index signatures (e.g., `[key: string]: unknown`) directly on typed 
+    [architecture] (conf=0.78) For telemetry attribute values, prefer JSON-serializable values over OpenTelemet
+    [architecture] (conf=0.78) OpenTelemetry provider implementations should be in a separate package from the 
+    [style       ] (conf=0.78) Example files should be prefixed with the provider name (e.g., 'open-responses-l
+    [style       ] (conf=0.75) Prefer specific TypeScript types over `unknown` for interface fields. When a fie
+    [architecture] (conf=0.75) When adding new exports to internal modules (e.g., `openai-compatible/src/intern
+    [workflow    ] (conf=0.75) When replacing or migrating examples to a new provider/pattern, preserve the old
+    [workflow    ] (conf=0.73) When adding new features to the v6 gateway provider, evaluate whether the featur
+    [architecture] (conf=0.72) When using fire-and-forget promise calls (e.g., calling an async function withou
+    [architecture] (conf=0.72) When building a new AI provider package, prefer extending `@ai-sdk/openai-compat
