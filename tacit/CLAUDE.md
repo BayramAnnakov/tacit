@@ -1,80 +1,50 @@
-# Tacit — Team Knowledge Extraction
-
-Extract tacit knowledge from GitHub PRs and Claude Code conversations, surface it for team review, and generate CLAUDE.md files.
+# Project Guidelines
 
 ## Architecture
 
-**Backend** (Python 3.12+, FastAPI)
-- `backend/main.py` — REST API + WebSocket server (port 8000)
-- `backend/pipeline.py` — 4-pass extraction pipeline using Claude Agent SDK
-- `backend/agents.py` — 5 agent definitions (pr-scanner, thread-analyzer, synthesizer, generator, local-extractor)
-- `backend/tools.py` — MCP tools (GitHub API, log reader, knowledge storage)
-- `backend/database.py` — SQLite via aiosqlite (tacit.db)
-- `backend/models.py` — Pydantic models
-- `backend/proposals.py` — Proposal approve/reject logic
-- `backend/config.py` — Settings from .env
-- `backend/prompts/*.md` — Agent system prompt templates
+### API Providers
+- Only use Anthropic's own API providers (direct Anthropic API, AWS Bedrock, Google Vertex). Third-party proxies (OpenRouter, LiteLLM) are unsupported — Claude Code requires Anthropic-formatted API responses and OpenAI-formatted responses will not work even through a proxy. *(confidence: 0.95)*
+- Configure API providers via environment variables: `ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_BEDROCK_BASE_URL`, `ANTHROPIC_VERTEX_BASE_URL`, `ANTHROPIC_VERTEX_PROJECT_ID`, `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, `ANTHROPIC_MODEL`, `AWS_REGION`, `CLOUD_ML_REGION`, `DISABLE_PROMPT_CACHING`, and `API_TIMEOUT_MS`. *(confidence: 0.85)*
+- Expect Anthropic-formatted API responses only. Response format parsing is tightly coupled to the Anthropic API schema. *(confidence: 0.80)*
 
-**Frontend** (Swift 5.9, SwiftUI, macOS 14+)
-- `TacitApp/Sources/TacitApp/` — macOS app
-- `Services/BackendService.swift` — HTTP + WebSocket client
-- `ViewModels/` — AppViewModel, ExtractionViewModel, KnowledgeViewModel, ProposalViewModel
-- `Views/` — ExtractionStreamView, KnowledgeBrowserView, ProposalListView, MyDiscoveriesView, ClaudeMDEditorView
-- `Models/` — Repository, KnowledgeRule, Proposal, ExtractionEvent, DecisionTrail
+### Shell Compatibility
+- Test subprocess interactions against non-POSIX shells (fish, nushell, zsh) in addition to bash. Non-POSIX shells can cause Claude Code to hang indefinitely. Use `SHELL=/bin/bash claude` as a workaround when running from non-bash shells. *(confidence: 0.95)*
+- When building CLI tools that spawn subprocesses, always test against non-POSIX shells — shell-specific syntax differences can cause commands to hang or fail silently. *(confidence: 0.85)*
 
-## Dev Commands
+### Refactoring
+- Extract distinct responsibilities from large service classes into separate utility classes. Target reducing monolithic services to pure orchestration logic, keeping each extracted component independently testable. *(confidence: 0.85)*
+- Replace complex conditional logic (long if/else chains) with rule-based decision maps using clear priority ordering and centralized configuration. *(confidence: 0.85)*
+- Maintain backward compatibility when refactoring — the public interface must remain unchanged for consuming services, and all existing tests must pass. *(confidence: 0.80)*
 
-```bash
-# Backend
-cd tacit/backend
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-python main.py  # starts on localhost:8000
+### Terminal UI
+- Do not require elevated (sudo/root) permissions for terminal UI features to render correctly. If a display issue is resolved by running with sudo, treat it as a file permission or terminal capability bug that needs a proper fix. *(confidence: 0.75)*
 
-# Frontend
-cd tacit/TacitApp
-swift build
-swift run TacitApp  # or open in Xcode
+## Code Style
+- Replace complex conditional logic (long if/else chains) with rule-based decision maps that have clear priority ordering. Centralize pattern weights and configurations rather than scattering them through service methods. *(confidence: 0.70)*
 
-# Reset DB (after schema changes)
-rm backend/tacit.db  # auto-recreated on startup
-```
+## Testing
+- Use mock gateways (e.g., `MockKernelGateway`) in integration tests to prevent real HTTP calls. Never allow integration tests to make actual network requests to external services. *(confidence: 0.75)*
+- Test CLI terminal rendering across multiple shells (zsh, fish, bash), multiple terminal emulators (Terminal.app, Ghostty, Kitty, iTerm2), and multiple Node.js versions (v18 LTS through current) to catch cross-environment compatibility issues. *(confidence: 0.70)*
 
-## API Endpoints
+## Workflow
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | /api/health | Health check |
-| POST | /api/repos | Connect a repository |
-| GET | /api/repos | List repositories |
-| POST | /api/extract/{repo_id} | Start extraction (body: {github_token}) |
-| GET | /api/knowledge?q=&category=&repo_id= | List/search knowledge rules |
-| GET | /api/knowledge/{id} | Rule detail + decision trail |
-| POST | /api/proposals | Create proposal |
-| GET | /api/proposals?status= | List proposals |
-| PUT | /api/proposals/{id} | Approve/reject proposal |
-| GET | /api/claude-md/{repo_id} | Generate CLAUDE.md |
-| POST | /api/local-extract | Extract from local logs |
-| WS | /ws | Real-time extraction events |
+### Issue Management
+- Auto-lock closed issues after 7 days of inactivity. Direct users experiencing similar issues to file a new issue and reference the closed one. *(confidence: 0.95)*
+- When triaging CLI rendering or display bugs, collect the user's Node.js version, shell (e.g., zsh, fish, bash), terminal emulator (e.g., Terminal.app, Ghostty, Kitty, iTerm2), and OS version before investigating. *(confidence: 0.90)*
+- When evaluating community feature requests, gather user context and use cases before making a decision. When declining a request, provide a clear and concise response rather than leaving the discussion open-ended. *(confidence: 0.85)*
+- When closing a bug that affected multiple users, ask reporters to confirm the fix in the specific version that addresses it rather than silently closing the issue. *(confidence: 0.65)*
 
-## WebSocket Event Wire Format
+### Shell Environment
+- Ensure the `SHELL` environment variable is set to a POSIX-compatible shell (e.g., bash) when running Claude Code. Use `SHELL=/bin/bash claude` as a workaround from non-bash shells. *(confidence: 0.90)*
 
-```json
-{"type": "<frontend_event_type>", "data": {"message": "...", ...}, "timestamp": "ISO8601"}
-```
+### Commits & Code Review
+- Use conventional commit format for commit messages (e.g., `refactor(scope):`, `build(deps):`, `test(scope):`). Include the component scope in parentheses and a concise description of the change. *(confidence: 0.70)*
 
-Frontend event types: `rule_discovered`, `analyzing`, `pattern_merged`, `stage_complete`, `error`, `info`
+### Observability
+- Provide a verbose or debug mode in CLI tools that surfaces model interactions, console output, and internal state. Users need observability into what's happening when a tool hangs or fails silently. *(confidence: 0.70)*
 
-## Extraction Pipeline
+## Security
+- Document security vulnerability reporting in a `SECURITY.md` file at the repository root, directing reporters to the organization's official bug bounty program (e.g., HackerOne). *(confidence: 0.85)*
 
-1. **PR Scanner** (Sonnet) — Identifies knowledge-rich PRs
-2. **Thread Analyzer** (Opus) — Extracts rules from PR discussions
-3. **Synthesizer** (Opus) — Merges/deduplicates rules
-4. **Generator** (Opus) — Generates CLAUDE.md from knowledge base
-
-## Conventions
-
-- Backend: snake_case, async/await throughout, aiosqlite for DB
-- Frontend: Swift naming conventions, @Observable for state, CodingKeys for snake_case ↔ camelCase
-- All data values in WebSocket events must be stringified for Swift `[String: String]`
-- Environment: .env for secrets (ANTHROPIC_API_KEY, GITHUB_TOKEN)
+## Performance
+- When Claude Code operations hang or never complete (especially on large repositories), check the user's shell environment first. Shell incompatibility (particularly with fish shell) is a known root cause of indefinite hangs. *(confidence: 0.85)*

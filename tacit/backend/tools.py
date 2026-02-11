@@ -37,7 +37,7 @@ async def github_fetch_prs(args: dict) -> dict:
         "Accept": "application/vnd.github.v3+json",
     }
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         resp = await client.get(
             f"https://api.github.com/repos/{repo}/pulls",
             params={"state": state, "per_page": per_page, "sort": "updated", "direction": "desc"},
@@ -93,7 +93,7 @@ async def github_fetch_comments(args: dict) -> dict:
 
     all_comments = []
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         # Fetch issue comments
         resp = await client.get(
             f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments",

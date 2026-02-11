@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 
 from claude_agent_sdk import (
-    query,
+    ClaudeSDKClient,
     ClaudeAgentOptions,
     AssistantMessage,
     ResultMessage,
@@ -41,14 +41,20 @@ async def _run_agent(
     )
 
     result_text = []
-    async for message in query(prompt=prompt, options=options):
-        if isinstance(message, AssistantMessage):
-            for block in message.content:
-                if isinstance(block, TextBlock):
-                    result_text.append(block.text)
-        elif isinstance(message, ResultMessage):
-            if message.is_error:
-                logger.error(f"Agent {agent_name} error: {message.result}")
+    client = ClaudeSDKClient(options=options)
+    await client.connect()
+    try:
+        await client.query(prompt)
+        async for message in client.receive_response():
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        result_text.append(block.text)
+            elif isinstance(message, ResultMessage):
+                if message.is_error:
+                    logger.error(f"Agent {agent_name} error: {message.result}")
+    finally:
+        await client.disconnect()
 
     return "\n".join(result_text)
 
