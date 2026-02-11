@@ -1,0 +1,12 @@
+.env
+*.db
+venv/
+__pycache__/
+.DS_Store
+.build/
+.swiftpm/
+tacit/backend/logs/
+tacit/backend/tacit.db
+.beads/
+*.db-shm
+*.db-wal
