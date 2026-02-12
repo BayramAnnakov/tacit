@@ -1,0 +1,20 @@
+{
+  "action": "closed",
+  "pull_request": {
+    "number": 42,
+    "title": "Add retry logic for API calls",
+    "merged": true,
+    "merged_at": "2026-02-10T12:00:00Z",
+    "user": {
+      "login": "developer"
+    },
+    "body": "Added exponential backoff retry for external API calls"
+  },
+  "repository": {
+    "full_name": "anthropics/claude-code",
+    "name": "claude-code",
+    "owner": {
+      "login": "anthropics"
+    }
+  }
+}

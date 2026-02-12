@@ -109,6 +109,9 @@ struct ProposalCardView: View {
             HStack(spacing: 6) {
                 CategoryPill(category: proposal.category)
                 ConfidenceBadge(confidence: proposal.confidence)
+                if proposal.contributorCount > 1 {
+                    ConsensusIndicator(count: proposal.contributorCount)
+                }
                 Spacer()
                 Text("by \(proposal.proposedBy)")
                     .font(.caption2)

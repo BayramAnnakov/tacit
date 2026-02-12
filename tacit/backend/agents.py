@@ -45,6 +45,12 @@ def get_agent_definitions() -> dict[str, AgentDefinition]:
             model="opus",
             tools=["github_fetch_ci_fixes", "store_knowledge", "search_knowledge"],
         ),
+        "code-analyzer": AgentDefinition(
+            description="Extracts conventions from config files, CI workflows, and package manager configs",
+            prompt=_load_prompt("code_analyzer.md"),
+            model="sonnet",
+            tools=["github_fetch_code_samples", "store_knowledge", "search_knowledge"],
+        ),
         "synthesizer": AgentDefinition(
             description="Cross-source synthesis: merges, deduplicates, boosts, and refines extracted rules",
             prompt=_load_prompt("synthesizer.md"),
@@ -62,5 +68,11 @@ def get_agent_definitions() -> dict[str, AgentDefinition]:
             prompt=_load_prompt("local_extractor.md"),
             model="sonnet",
             tools=["read_claude_logs", "store_knowledge", "search_knowledge"],
+        ),
+        "pr-validator": AgentDefinition(
+            description="Validates PR changes against extracted knowledge rules, finding violations",
+            prompt=_load_prompt("pr_validator.md"),
+            model="opus",
+            tools=["github_fetch_pr_diff", "list_all_knowledge", "search_knowledge"],
         ),
     }

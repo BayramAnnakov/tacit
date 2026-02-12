@@ -5,6 +5,8 @@ struct ProposalReviewView: View {
     @Bindable var vm: ProposalViewModel
     @State private var feedback = ""
     @State private var reviewerName = NSFullUserName()
+    @State private var contributions: [ProposalContribution] = []
+    @State private var isLoadingContributions = false
 
     var body: some View {
         ScrollView {
@@ -13,6 +15,10 @@ struct ProposalReviewView: View {
                 Divider()
                 ruleSection
                 sourceSection
+                if proposal.contributorCount > 1 {
+                    Divider()
+                    consensusSection
+                }
                 if proposal.status == .pending {
                     Divider()
                     reviewSection
@@ -25,6 +31,17 @@ struct ProposalReviewView: View {
             .padding(24)
         }
         .navigationTitle("Review Proposal")
+        .task(id: proposal.id) {
+            if proposal.contributorCount > 1 {
+                isLoadingContributions = true
+                do {
+                    contributions = try await BackendService.shared.getProposalContributions(proposalId: proposal.id)
+                } catch {
+                    contributions = []
+                }
+                isLoadingContributions = false
+            }
+        }
     }
 
     private var header: some View {
@@ -98,6 +115,49 @@ struct ProposalReviewView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.tertiary.opacity(0.3))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    private var consensusSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Team Consensus", systemImage: "person.2.fill")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+
+            Text("\(proposal.contributorCount) contributors independently discovered this pattern")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            if isLoadingContributions {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(contributions) { contribution in
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "person.circle.fill")
+                                .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(contribution.contributorName)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                Text(contribution.originalRuleText)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                                Text("\(Int(contribution.similarityScore * 100))% similar")
+                                    .font(.caption2)
+                                    .foregroundStyle(.green)
+                            }
+                            Spacer()
+                        }
+                        .padding(10)
+                        .background(.quaternary)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
         }
     }
 

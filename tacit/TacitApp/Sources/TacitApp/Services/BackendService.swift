@@ -88,12 +88,58 @@ final class BackendService {
         return try decoder.decode(Proposal.self, from: data)
     }
 
+    func getProposalContributions(proposalId: Int) async throws -> [ProposalContribution] {
+        let data = try await get("/api/proposals/\(proposalId)/contributions")
+        let response = try decoder.decode(ProposalContributionsResponse.self, from: data)
+        return response.contributions
+    }
+
+    func contribute(contributorName: String, rules: [ContributeRule], projectHint: String = "") async throws -> ContributeResponse {
+        let payload = ContributePayload(
+            contributor_name: contributorName,
+            rules: rules,
+            project_hint: projectHint,
+            client_version: "0.1.0"
+        )
+        let data = try await post("/api/contribute", body: payload)
+        return try decoder.decode(ContributeResponse.self, from: data)
+    }
+
     // MARK: - CLAUDE.md
 
     func getClaudeMD(repoId: Int) async throws -> String {
         let data = try await get("/api/claude-md/\(repoId)")
         let response = try decoder.decode(ClaudeMDResponse.self, from: data)
         return response.content
+    }
+
+    func getClaudeMDDiff(repoId: Int) async throws -> ClaudeMDDiffResponse {
+        let data = try await get("/api/claude-md/\(repoId)/diff")
+        return try decoder.decode(ClaudeMDDiffResponse.self, from: data)
+    }
+
+    func createPR(repoId: Int, content: String, branchName: String = "tacit/update-claude-md") async throws -> CreatePRResponse {
+        struct Body: Encodable {
+            let content: String
+            let branch_name: String
+        }
+        let data = try await post("/api/claude-md/\(repoId)/create-pr", body: Body(content: content, branch_name: branchName))
+        return try decoder.decode(CreatePRResponse.self, from: data)
+    }
+
+    // MARK: - Feedback
+
+    func sendFeedback(ruleId: Int, vote: String) async throws -> KnowledgeRule {
+        struct Body: Encodable { let vote: String }
+        let data = try await post("/api/knowledge/\(ruleId)/feedback", body: Body(vote: vote))
+        return try decoder.decode(KnowledgeRule.self, from: data)
+    }
+
+    // MARK: - Cross-Repo Intelligence
+
+    func getCrossRepoPatterns() async throws -> CrossRepoResponse {
+        let data = try await get("/api/knowledge/cross-repo")
+        return try decoder.decode(CrossRepoResponse.self, from: data)
     }
 
     // MARK: - WebSocket
@@ -217,4 +263,108 @@ struct NewProposal: Codable {
 
 struct ClaudeMDResponse: Codable {
     var content: String
+}
+
+struct DiffLine: Codable, Identifiable {
+    let id: UUID
+    let type: String
+    let text: String
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = UUID()
+        self.type = try container.decode(String.self, forKey: .type)
+        self.text = try container.decode(String.self, forKey: .text)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case type, text
+    }
+}
+
+struct ClaudeMDDiffResponse: Codable {
+    let existing: String
+    let generated: String
+    let diffLines: [DiffLine]
+
+    enum CodingKeys: String, CodingKey {
+        case existing, generated
+        case diffLines = "diff_lines"
+    }
+}
+
+struct CreatePRResponse: Codable {
+    let prUrl: String
+    let prNumber: Int
+    let branchName: String
+
+    enum CodingKeys: String, CodingKey {
+        case prUrl = "pr_url"
+        case prNumber = "pr_number"
+        case branchName = "branch_name"
+    }
+}
+
+struct OrgPattern: Codable, Identifiable {
+    var id: String { ruleText }
+    let ruleText: String
+    let repos: [String]
+    let frequency: Int
+    let category: String
+
+    enum CodingKeys: String, CodingKey {
+        case ruleText = "rule_text"
+        case repos, frequency, category
+    }
+}
+
+struct CrossRepoResponse: Codable {
+    let orgPatterns: [OrgPattern]
+
+    enum CodingKeys: String, CodingKey {
+        case orgPatterns = "org_patterns"
+    }
+}
+
+struct ProposalContributionsResponse: Codable {
+    let proposalId: Int
+    let contributions: [ProposalContribution]
+
+    enum CodingKeys: String, CodingKey {
+        case proposalId = "proposal_id"
+        case contributions
+    }
+}
+
+struct ContributePayload: Encodable {
+    let contributor_name: String
+    let rules: [ContributeRule]
+    let project_hint: String
+    let client_version: String
+}
+
+struct ContributeRule: Encodable {
+    let rule_text: String
+    let category: String
+    let confidence: Double
+    let source_excerpt: String
+}
+
+struct ContributeResponse: Codable {
+    let accepted: Int
+    let results: [ContributeResult]
+}
+
+struct ContributeResult: Codable {
+    let action: String
+    let proposalId: Int
+    let contributorCount: Int
+    let similarityScore: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case action
+        case proposalId = "proposal_id"
+        case contributorCount = "contributor_count"
+        case similarityScore = "similarity_score"
+    }
 }

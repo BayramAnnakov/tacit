@@ -4,8 +4,10 @@ import asyncio
 import difflib
 import json
 import logging
+import math
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from difflib import SequenceMatcher
 
 import httpx
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, Query
@@ -17,6 +19,125 @@ import proposals as prop
 from pipeline import run_extraction, run_local_extraction, generate_claude_md, run_single_pr_extraction
 from config import settings
 from models import ExtractionEvent, PRValidationRequest, RuleViolation, PRValidationResult
+
+
+# --------------- Semantic Similarity ---------------
+
+async def find_semantic_match(
+    rule_text: str,
+    pending_proposals: list[dict],
+) -> tuple[dict | None, float]:
+    """Use Claude to find the best semantic match for a rule among pending proposals.
+
+    Returns (matching_proposal, similarity_score) or (None, 0.0) if no match.
+    Falls back to SequenceMatcher if ANTHROPIC_API_KEY is missing or Claude call fails.
+    """
+    if not pending_proposals:
+        return None, 0.0
+
+    # Fallback: use SequenceMatcher if no API key
+    if not settings.ANTHROPIC_API_KEY:
+        return _sequencematcher_fallback(rule_text, pending_proposals)
+
+    try:
+        return await asyncio.wait_for(
+            _claude_semantic_match(rule_text, pending_proposals),
+            timeout=10.0,
+        )
+    except Exception as e:
+        logger.warning(f"Claude semantic match failed, falling back to SequenceMatcher: {e}")
+        return _sequencematcher_fallback(rule_text, pending_proposals)
+
+
+def _sequencematcher_fallback(
+    rule_text: str,
+    pending_proposals: list[dict],
+) -> tuple[dict | None, float]:
+    """Character-level similarity fallback using SequenceMatcher."""
+    best_match = None
+    best_score = 0.0
+    for proposal in pending_proposals:
+        score = SequenceMatcher(
+            None, rule_text.lower(), proposal["rule_text"].lower()
+        ).ratio()
+        if score > 0.65 and score > best_score:
+            best_match = proposal
+            best_score = score
+    return best_match, best_score
+
+
+async def _claude_semantic_match(
+    rule_text: str,
+    pending_proposals: list[dict],
+) -> tuple[dict | None, float]:
+    """Call Claude to semantically compare a rule against pending proposals."""
+    from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessage, ResultMessage, TextBlock
+
+    # Build numbered list of proposals
+    proposals_text = "\n".join(
+        f"{i}: {p['rule_text']}" for i, p in enumerate(pending_proposals)
+    )
+
+    system_prompt = (
+        "You compare software development rules for semantic similarity. "
+        "Respond with ONLY a JSON object, no other text. "
+        "Format: {\"match_index\": N, \"similarity\": 0.XX} "
+        "where match_index is the 0-based index of the best match (-1 if none are similar) "
+        "and similarity is a float from 0.0 to 1.0. "
+        "Two rules are similar if they express the same convention or practice, "
+        "even if worded differently."
+    )
+
+    user_prompt = (
+        f"New rule: \"{rule_text}\"\n\n"
+        f"Existing proposals:\n{proposals_text}\n\n"
+        "Which existing proposal (if any) is semantically the same as the new rule? "
+        "Return JSON with match_index and similarity."
+    )
+
+    options = ClaudeAgentOptions(
+        system_prompt=system_prompt,
+        model="sonnet",
+        mcp_servers={},
+        allowed_tools=[],
+        permission_mode="bypassPermissions",
+        max_turns=1,
+    )
+
+    result_text = []
+    client = ClaudeSDKClient(options=options)
+    await client.connect()
+    try:
+        await client.query(user_prompt)
+        async for message in client.receive_response():
+            if isinstance(message, ResultMessage):
+                if message.is_error:
+                    logger.error(f"Claude semantic match error: {message.result}")
+                    return None, 0.0
+            elif isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        result_text.append(block.text)
+    finally:
+        await client.disconnect()
+
+    # Parse JSON response
+    raw = "".join(result_text).strip()
+    # Extract JSON from potential markdown code blocks
+    if "```" in raw:
+        import re
+        json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', raw, re.DOTALL)
+        if json_match:
+            raw = json_match.group(1)
+
+    parsed = json.loads(raw)
+    match_index = parsed.get("match_index", -1)
+    similarity = float(parsed.get("similarity", 0.0))
+
+    if match_index >= 0 and match_index < len(pending_proposals) and similarity >= 0.60:
+        return pending_proposals[match_index], similarity
+
+    return None, 0.0
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -102,6 +223,57 @@ async def seed_demo_data() -> None:
         proposed_by="Sarah",
     )
 
+    # --- Federated contribution demo data ---
+    # Create a proposal with multiple contributors (consensus)
+    fed_proposal = await db.create_proposal(
+        rule_text="Use structured logging (JSON format) instead of print statements for all backend services",
+        category="architecture",
+        confidence=0.92,
+        source_excerpt="Multiple team members independently identified this pattern from debugging sessions",
+        proposed_by="Sarah",
+    )
+    fed_id = fed_proposal["id"]
+    await db.add_proposal_contribution(
+        proposal_id=fed_id, contributor_name="Sarah",
+        original_rule_text="Use structured logging (JSON format) instead of print statements for all backend services",
+        original_confidence=0.85, source_excerpt="From debugging a production incident", similarity_score=1.0,
+    )
+    await db.add_proposal_contribution(
+        proposal_id=fed_id, contributor_name="Alex",
+        original_rule_text="Always use JSON-formatted logging instead of print() for server-side code",
+        original_confidence=0.80, source_excerpt="Claude suggested this pattern in code review", similarity_score=0.72,
+    )
+    await db.add_proposal_contribution(
+        proposal_id=fed_id, contributor_name="Bayram",
+        original_rule_text="Replace print debugging with structured JSON logs for better observability",
+        original_confidence=0.88, source_excerpt="Noticed during log aggregation setup", similarity_score=0.68,
+    )
+    await db.update_proposal_confidence(fed_id, consensus_confidence(0.85, 3), 3)
+    if repo_id:
+        await db.update_proposal_repo_id(fed_id, repo_id)
+
+    fed_proposal2 = await db.create_proposal(
+        rule_text="Pin all Python dependencies to exact versions in requirements.txt",
+        category="workflow",
+        confidence=0.88,
+        source_excerpt="Two developers hit dependency conflicts in the same week",
+        proposed_by="Alex",
+    )
+    fed2_id = fed_proposal2["id"]
+    await db.add_proposal_contribution(
+        proposal_id=fed2_id, contributor_name="Alex",
+        original_rule_text="Pin all Python dependencies to exact versions in requirements.txt",
+        original_confidence=0.82, source_excerpt="Hit a breaking change from an unpinned dep", similarity_score=1.0,
+    )
+    await db.add_proposal_contribution(
+        proposal_id=fed2_id, contributor_name="Sarah",
+        original_rule_text="Always pin exact versions for Python packages to avoid surprise breakage",
+        original_confidence=0.85, source_excerpt="Same issue with numpy update breaking tests", similarity_score=0.78,
+    )
+    await db.update_proposal_confidence(fed2_id, consensus_confidence(0.82, 2), 2)
+    if repo_id:
+        await db.update_proposal_repo_id(fed2_id, repo_id)
+
     logger.info("Demo data seeded successfully")
 
 
@@ -165,6 +337,30 @@ class FeedbackRequest(BaseModel):
 
 class LocalExtractRequest(BaseModel):
     project_path: str
+
+
+class ContributedRule(BaseModel):
+    rule_text: str
+    category: str = "general"
+    confidence: float = 0.8
+    source_excerpt: str = ""
+
+
+class ContributionPayload(BaseModel):
+    contributor_name: str
+    rules: list[ContributedRule]
+    project_hint: str = ""  # "owner/repo" from git remote
+    client_version: str = ""
+
+
+# --------------- Helpers ---------------
+
+
+def consensus_confidence(base: float, contributor_count: int) -> float:
+    """base + 0.08 * log2(count), capped at 0.98"""
+    if contributor_count <= 1:
+        return base
+    return min(0.98, base + 0.08 * math.log2(contributor_count))
 
 
 # --------------- Repository Endpoints ---------------
@@ -341,6 +537,99 @@ async def review_proposal(proposal_id: int, body: ProposalReview):
     if not result:
         raise HTTPException(status_code=404, detail="Proposal not found")
     return result
+
+
+# --------------- Federated Contribution ---------------
+
+@app.post("/api/contribute")
+async def contribute_rules(body: ContributionPayload):
+    """Accept federated contributions from developers' local extractions."""
+    # Resolve project_hint → repo_id
+    repo_id = None
+    if body.project_hint:
+        repos = await db.list_repos()
+        for r in repos:
+            if r["full_name"] == body.project_hint:
+                repo_id = r["id"]
+                break
+
+    results = []
+    pending_proposals = await db.find_similar_pending_proposals("")
+
+    for rule in body.rules:
+        # Find semantically similar pending proposal (Claude-powered)
+        best_match, best_score = await find_semantic_match(rule.rule_text, pending_proposals)
+
+        if best_match:
+            # Merge into existing proposal
+            proposal_id = best_match["id"]
+            await db.add_proposal_contribution(
+                proposal_id=proposal_id,
+                contributor_name=body.contributor_name,
+                original_rule_text=rule.rule_text,
+                original_confidence=rule.confidence,
+                source_excerpt=rule.source_excerpt,
+                similarity_score=best_score,
+            )
+            count = await db.get_contribution_count(proposal_id)
+            new_confidence = consensus_confidence(best_match["confidence"], count)
+            await db.update_proposal_confidence(proposal_id, new_confidence, count)
+            if repo_id:
+                await db.update_proposal_repo_id(proposal_id, repo_id)
+            results.append({
+                "action": "merged",
+                "proposal_id": proposal_id,
+                "contributor_count": count,
+                "similarity_score": round(best_score, 2),
+            })
+        else:
+            # Create new proposal
+            new_proposal = await db.create_proposal(
+                rule_text=rule.rule_text,
+                category=rule.category,
+                confidence=rule.confidence,
+                source_excerpt=rule.source_excerpt,
+                proposed_by=body.contributor_name,
+            )
+            proposal_id = new_proposal["id"]
+            # Record initial contribution
+            await db.add_proposal_contribution(
+                proposal_id=proposal_id,
+                contributor_name=body.contributor_name,
+                original_rule_text=rule.rule_text,
+                original_confidence=rule.confidence,
+                source_excerpt=rule.source_excerpt,
+                similarity_score=1.0,
+            )
+            if repo_id:
+                await db.update_proposal_repo_id(proposal_id, repo_id)
+            # Add to pending list for subsequent rules in this batch
+            pending_proposals.append(new_proposal)
+            results.append({
+                "action": "created",
+                "proposal_id": proposal_id,
+                "contributor_count": 1,
+            })
+
+    # Broadcast WebSocket event
+    await broadcast_event(ExtractionEvent(
+        event_type="progress",
+        stage="contribution",
+        message=f"{body.contributor_name} contributed {len(body.rules)} rule(s)",
+        data={"contributor": body.contributor_name, "count": len(body.rules)},
+    ))
+
+    return {"accepted": len(results), "results": results}
+
+
+@app.get("/api/proposals/{proposal_id}/contributions")
+async def get_proposal_contributions(proposal_id: int):
+    """List contribution history for a proposal."""
+    proposal = await db.get_proposal(proposal_id)
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    contributions = await db.list_proposal_contributions(proposal_id)
+    return {"proposal_id": proposal_id, "contributions": contributions}
 
 
 # --------------- CLAUDE.md Generation ---------------

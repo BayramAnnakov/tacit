@@ -485,6 +485,101 @@ async def github_fetch_ci_fixes(args: dict) -> dict:
     return {"content": [{"type": "text", "text": json.dumps(ci_fixes, indent=2)}]}
 
 
+@tool(
+    name="github_fetch_code_samples",
+    description="Fetch key configuration and code files from a repository: test configs, linter configs, CI workflows, and package manager configs. Returns file contents for convention extraction.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "repo": {"type": "string", "description": "Full repo name e.g. 'owner/repo'"},
+            "github_token": {"type": "string", "description": "GitHub API token"},
+        },
+        "required": ["repo", "github_token"],
+    },
+)
+async def github_fetch_code_samples(args: dict) -> dict:
+    repo = args["repo"]
+    token = args["github_token"]
+    headers = _gh_headers(token)
+    headers["Accept"] = "application/vnd.github.v3.raw"
+
+    config_paths = [
+        # Test configs
+        "jest.config.js", "jest.config.ts", "jest.config.mjs",
+        "pytest.ini", "setup.cfg", "pyproject.toml",
+        "vitest.config.ts", "vitest.config.js",
+        # Linter configs
+        ".eslintrc.json", ".eslintrc.js", ".eslintrc.yml",
+        ".ruff.toml", "ruff.toml",
+        "biome.json", "biome.jsonc",
+        ".prettierrc", ".prettierrc.json",
+        # CI workflows
+        ".github/workflows/ci.yml", ".github/workflows/ci.yaml",
+        ".github/workflows/test.yml", ".github/workflows/tests.yml",
+        ".github/workflows/lint.yml", ".github/workflows/build.yml",
+        # Package configs
+        "package.json", "Makefile", "Cargo.toml",
+        "tsconfig.json", "Dockerfile",
+    ]
+
+    result: dict[str, str] = {}
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        for filepath in config_paths:
+            resp = await client.get(
+                f"https://api.github.com/repos/{repo}/contents/{filepath}",
+                headers=headers, timeout=15,
+            )
+            if resp.status_code == 200:
+                content = resp.text[:10000]
+                result[filepath] = content
+
+    if not result:
+        return {"content": [{"type": "text", "text": "No configuration files found in this repository."}]}
+
+    return {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]}
+
+
+@tool(
+    name="github_fetch_pr_diff",
+    description="Fetch the file changes (diff) for a specific pull request. Returns changed files with their patches.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "repo": {"type": "string", "description": "Full repo name e.g. 'owner/repo'"},
+            "pr_number": {"type": "integer", "description": "Pull request number"},
+            "github_token": {"type": "string", "description": "GitHub API token"},
+        },
+        "required": ["repo", "pr_number", "github_token"],
+    },
+)
+async def github_fetch_pr_diff(args: dict) -> dict:
+    repo = args["repo"]
+    pr_number = args["pr_number"]
+    token = args["github_token"]
+    headers = _gh_headers(token)
+
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        resp = await client.get(
+            f"https://api.github.com/repos/{repo}/pulls/{pr_number}/files",
+            headers=headers, timeout=30,
+            params={"per_page": 100},
+        )
+        if resp.status_code != 200:
+            return {"content": [{"type": "text", "text": f"GitHub API error {resp.status_code}: {resp.text}"}], "is_error": True}
+
+        files = []
+        for f in resp.json():
+            files.append({
+                "filename": f["filename"],
+                "status": f["status"],
+                "additions": f.get("additions", 0),
+                "deletions": f.get("deletions", 0),
+                "patch": (f.get("patch") or "")[:2000],
+            })
+
+    return {"content": [{"type": "text", "text": json.dumps(files, indent=2)}]}
+
+
 # --------------- Local Log Tools ---------------
 
 @tool(
@@ -665,6 +760,8 @@ def create_tacit_tools_server():
             github_fetch_repo_structure,
             github_fetch_docs,
             github_fetch_ci_fixes,
+            github_fetch_code_samples,
+            github_fetch_pr_diff,
             read_claude_logs,
             store_knowledge,
             search_knowledge,
@@ -681,6 +778,8 @@ _RAW_TOOL_NAMES = [
     "github_fetch_repo_structure",
     "github_fetch_docs",
     "github_fetch_ci_fixes",
+    "github_fetch_code_samples",
+    "github_fetch_pr_diff",
     "read_claude_logs",
     "store_knowledge",
     "search_knowledge",

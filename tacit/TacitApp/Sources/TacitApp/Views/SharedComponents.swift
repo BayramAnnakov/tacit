@@ -49,15 +49,36 @@ struct SourceBadge: View {
     let sourceType: KnowledgeRule.SourceType
 
     var color: Color {
-        sourceType == .pr ? .blue : .purple
+        switch sourceType {
+        case .pr: return .blue
+        case .conversation: return .purple
+        case .structure: return .teal
+        case .docs: return .indigo
+        case .cifix: return .red
+        case .config: return .cyan
+        }
     }
 
     var label: String {
-        sourceType == .pr ? "PR" : "Conv"
+        switch sourceType {
+        case .pr: return "PR"
+        case .conversation: return "Conv"
+        case .structure: return "Struct"
+        case .docs: return "Docs"
+        case .cifix: return "CI Fix"
+        case .config: return "Config"
+        }
     }
 
     var icon: String {
-        sourceType == .pr ? "arrow.triangle.pull" : "bubble.left.and.bubble.right"
+        switch sourceType {
+        case .pr: return "arrow.triangle.pull"
+        case .conversation: return "bubble.left.and.bubble.right"
+        case .structure: return "folder.badge.gearshape"
+        case .docs: return "doc.text.magnifyingglass"
+        case .cifix: return "exclamationmark.triangle"
+        case .config: return "gearshape.2"
+        }
     }
 
     var body: some View {
@@ -179,5 +200,26 @@ struct EmptyStateView: View {
                 .frame(maxWidth: 300)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Consensus Indicator
+
+struct ConsensusIndicator: View {
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "person.2.fill")
+                .font(.system(size: 8))
+            Text("\(count) agree")
+                .font(.caption2)
+                .fontWeight(.medium)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(.green.opacity(0.12))
+        .foregroundStyle(.green)
+        .clipShape(Capsule())
     }
 }

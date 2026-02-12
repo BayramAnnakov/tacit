@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS knowledge_rules (
     source_ref TEXT NOT NULL DEFAULT '',
     repo_id INTEGER REFERENCES repositories(id),
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    feedback_score INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS proposals (
@@ -69,6 +70,17 @@ CREATE TABLE IF NOT EXISTS decision_trail (
     source_ref TEXT NOT NULL DEFAULT '',
     timestamp TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS proposal_contributions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    proposal_id INTEGER NOT NULL REFERENCES proposals(id),
+    contributor_name TEXT NOT NULL,
+    original_rule_text TEXT NOT NULL,
+    original_confidence REAL NOT NULL DEFAULT 0.8,
+    source_excerpt TEXT NOT NULL DEFAULT '',
+    similarity_score REAL NOT NULL DEFAULT 1.0,
+    contributed_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 
@@ -87,6 +99,16 @@ async def init_db() -> None:
     try:
         await db.executescript(SCHEMA)
         await db.commit()
+        # Idempotent ALTER migrations for federated contributions
+        for alter in [
+            "ALTER TABLE proposals ADD COLUMN contributor_count INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE proposals ADD COLUMN repo_id INTEGER REFERENCES repositories(id)",
+        ]:
+            try:
+                await db.execute(alter)
+                await db.commit()
+            except Exception:
+                pass  # Column already exists
     finally:
         await db.close()
 
@@ -227,6 +249,37 @@ async def delete_rule(rule_id: int) -> bool:
         await db.close()
 
 
+async def update_feedback_score(rule_id: int, delta: int) -> dict | None:
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE knowledge_rules SET feedback_score = feedback_score + ? WHERE id = ?",
+            (delta, rule_id),
+        )
+        await db.commit()
+        row = await (await db.execute("SELECT * FROM knowledge_rules WHERE id = ?", (rule_id,))).fetchone()
+        return dict(row) if row else None
+    finally:
+        await db.close()
+
+
+async def get_source_quality_stats() -> list[dict]:
+    db = await get_db()
+    try:
+        rows = await (await db.execute(
+            """SELECT source_type,
+                      COUNT(*) as count,
+                      ROUND(AVG(confidence), 2) as avg_confidence,
+                      ROUND(AVG(feedback_score), 2) as avg_feedback
+               FROM knowledge_rules
+               GROUP BY source_type
+               ORDER BY avg_confidence DESC"""
+        )).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+
 # --------------- Proposals ---------------
 
 async def create_proposal(rule_text: str, category: str, confidence: float,
@@ -333,6 +386,89 @@ async def get_trail_for_rule(rule_id: int) -> list[dict]:
     try:
         rows = await (await db.execute(
             "SELECT * FROM decision_trail WHERE rule_id = ? ORDER BY timestamp ASC", (rule_id,)
+        )).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+
+# --------------- Proposal Contributions ---------------
+
+async def add_proposal_contribution(
+    proposal_id: int, contributor_name: str, original_rule_text: str,
+    original_confidence: float = 0.8, source_excerpt: str = "", similarity_score: float = 1.0,
+) -> dict:
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            """INSERT INTO proposal_contributions
+               (proposal_id, contributor_name, original_rule_text, original_confidence, source_excerpt, similarity_score)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (proposal_id, contributor_name, original_rule_text, original_confidence, source_excerpt, similarity_score),
+        )
+        await db.commit()
+        row = await (await db.execute("SELECT * FROM proposal_contributions WHERE id = ?", (cursor.lastrowid,))).fetchone()
+        return dict(row)
+    finally:
+        await db.close()
+
+
+async def list_proposal_contributions(proposal_id: int) -> list[dict]:
+    db = await get_db()
+    try:
+        rows = await (await db.execute(
+            "SELECT * FROM proposal_contributions WHERE proposal_id = ? ORDER BY contributed_at ASC",
+            (proposal_id,),
+        )).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+
+async def get_contribution_count(proposal_id: int) -> int:
+    db = await get_db()
+    try:
+        row = await (await db.execute(
+            "SELECT COUNT(DISTINCT contributor_name) as cnt FROM proposal_contributions WHERE proposal_id = ?",
+            (proposal_id,),
+        )).fetchone()
+        return row["cnt"] if row else 0
+    finally:
+        await db.close()
+
+
+async def update_proposal_confidence(proposal_id: int, confidence: float, contributor_count: int) -> dict | None:
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE proposals SET confidence = ?, contributor_count = ? WHERE id = ?",
+            (confidence, contributor_count, proposal_id),
+        )
+        await db.commit()
+        row = await (await db.execute("SELECT * FROM proposals WHERE id = ?", (proposal_id,))).fetchone()
+        return dict(row) if row else None
+    finally:
+        await db.close()
+
+
+async def update_proposal_repo_id(proposal_id: int, repo_id: int) -> None:
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE proposals SET repo_id = ? WHERE id = ?",
+            (repo_id, proposal_id),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def find_similar_pending_proposals(rule_text: str) -> list[dict]:
+    """Return all pending proposals for similarity comparison."""
+    db = await get_db()
+    try:
+        rows = await (await db.execute(
+            "SELECT * FROM proposals WHERE status = 'pending' ORDER BY created_at DESC"
         )).fetchall()
         return [dict(r) for r in rows]
     finally:

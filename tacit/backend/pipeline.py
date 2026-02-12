@@ -106,12 +106,15 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
         ci_fixes_task = asyncio.create_task(
             _run_ci_failure_mining(repo, github_token, repo_id)
         )
+        code_analysis_task = asyncio.create_task(
+            _run_code_analysis(repo, github_token, repo_id)
+        )
 
         yield ExtractionEvent(
             event_type="progress",
             stage="repo_analysis",
-            message="Launched parallel analysis: repo structure, docs, CI failures",
-            data={"parallel_tasks": ["structural", "docs", "ci_fixes"]},
+            message="Launched parallel analysis: repo structure, docs, CI failures, code analysis",
+            data={"parallel_tasks": ["structural", "docs", "ci_fixes", "code_analysis"]},
         )
 
         # === Phase 2: PR analysis (sequential, existing flow) ===
@@ -148,35 +151,45 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
         )
         await db.update_extraction_run(run_id, stage="analyzing")
 
-        rules_found = 0
-        for i, pr_num in enumerate(pr_numbers[:10]):
-            yield ExtractionEvent(
-                event_type="progress",
-                stage="analyzing",
-                message=f"Analyzing PR #{pr_num} ({i+1}/{len(pr_numbers[:10])})",
-                data={"pr_number": pr_num, "progress": i + 1, "total": len(pr_numbers[:10])},
+        # Analyze PR threads in parallel (up to 3 concurrent)
+        sem = asyncio.Semaphore(3)
+        pr_tasks = []
+        for pr_num in pr_numbers[:10]:
+            task = asyncio.create_task(
+                _analyze_single_pr(sem, repo, github_token, repo_id, pr_num)
             )
+            pr_tasks.append((pr_num, task))
 
-            analyzer_prompt = (
-                f"Analyze PR #{pr_num} in repository '{repo}'. "
-                f"Use github_fetch_comments with repo='{repo}', pr_number={pr_num}, github_token='{github_token}'. "
-                f"Extract knowledge rules and store them using store_knowledge with repo_id={repo_id}."
-            )
-            await _run_agent("thread-analyzer", analyzer_prompt, repo_id)
+        yield ExtractionEvent(
+            event_type="progress",
+            stage="analyzing",
+            message=f"Analyzing {len(pr_tasks)} PRs (3 concurrent)...",
+            data={"pr_count": len(pr_tasks)},
+        )
 
-            # Count rules after each PR
-            rules = await db.list_rules(repo_id=repo_id)
-            new_count = len(rules)
-            if new_count > rules_found:
-                yield ExtractionEvent(
-                    event_type="rule_found",
-                    stage="analyzing",
-                    message=f"Extracted {new_count - rules_found} new rules from PR #{pr_num}",
-                    data={"new_rules": new_count - rules_found, "total_rules": new_count},
-                )
-                rules_found = new_count
+        # Wait for all PR analyses to complete
+        results = await asyncio.gather(
+            *[t for _, t in pr_tasks],
+            return_exceptions=True,
+        )
 
-            await db.update_extraction_run(run_id, prs_analyzed=i + 1, rules_found=rules_found)
+        # Report results
+        for (pr_num, _), result in zip(pr_tasks, results):
+            if isinstance(result, Exception):
+                logger.warning(f"PR #{pr_num} analysis failed: {result}")
+
+        # Count rules after all PR analyses
+        rules = await db.list_rules(repo_id=repo_id)
+        rules_found = len(rules)
+
+        yield ExtractionEvent(
+            event_type="rule_found",
+            stage="analyzing",
+            message=f"PR analysis complete: {rules_found} rules found",
+            data={"total_rules": rules_found},
+        )
+
+        await db.update_extraction_run(run_id, prs_analyzed=len(pr_tasks), rules_found=rules_found)
 
         # === Phase 3: Await parallel tasks ===
         yield ExtractionEvent(
@@ -186,12 +199,12 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
         )
 
         parallel_results = await asyncio.gather(
-            structural_task, docs_task, ci_fixes_task,
+            structural_task, docs_task, ci_fixes_task, code_analysis_task,
             return_exceptions=True,
         )
 
         # Report parallel task results
-        task_names = ["Structural analysis", "Docs analysis", "CI failure mining"]
+        task_names = ["Structural analysis", "Docs analysis", "CI failure mining", "Code analysis"]
         for name, result in zip(task_names, parallel_results):
             if isinstance(result, Exception):
                 logger.warning(f"{name} failed: {result}")
@@ -271,6 +284,23 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
         )
 
 
+async def _analyze_single_pr(
+    sem: asyncio.Semaphore,
+    repo: str,
+    github_token: str,
+    repo_id: int,
+    pr_num: int,
+) -> str:
+    """Analyze a single PR with semaphore-limited concurrency."""
+    async with sem:
+        analyzer_prompt = (
+            f"Analyze PR #{pr_num} in repository '{repo}'. "
+            f"Use github_fetch_comments with repo='{repo}', pr_number={pr_num}, github_token='{github_token}'. "
+            f"Extract knowledge rules and store them using store_knowledge with repo_id={repo_id}."
+        )
+        return await _run_agent("thread-analyzer", analyzer_prompt, repo_id)
+
+
 async def _run_structural_analysis(repo: str, github_token: str, repo_id: int) -> str:
     """Run the structural analyzer agent."""
     prompt = (
@@ -302,6 +332,17 @@ async def _run_ci_failure_mining(repo: str, github_token: str, repo_id: int) -> 
         f"Store each convention using store_knowledge with source_type='ci_fix' and repo_id={repo_id}."
     )
     return await _run_agent("ci-failure-miner", prompt, repo_id)
+
+
+async def _run_code_analysis(repo: str, github_token: str, repo_id: int) -> str:
+    """Run the code analyzer agent."""
+    prompt = (
+        f"Analyze configuration files and code samples from repository '{repo}'. "
+        f"Use github_fetch_code_samples with repo='{repo}', github_token='{github_token}'. "
+        f"Extract conventions from test configs, linter configs, CI workflows, and package configs. "
+        f"Store each convention using store_knowledge with source_type='config' and repo_id={repo_id}."
+    )
+    return await _run_agent("code-analyzer", prompt, repo_id)
 
 
 def _parse_pr_numbers(scanner_result: str) -> list[int]:
@@ -355,6 +396,63 @@ async def run_local_extraction(project_path: str) -> AsyncIterator[ExtractionEve
             stage="error",
             message=f"Local extraction failed: {str(e)}",
         )
+
+
+async def run_single_pr_extraction(repo: str, pr_number: int, github_token: str) -> int:
+    """Extract knowledge from a single PR (used by webhook). Returns count of new proposals."""
+    # Find repo record
+    repos = await db.list_repos()
+    repo_record = None
+    for r in repos:
+        if r["full_name"] == repo:
+            repo_record = r
+            break
+
+    if not repo_record:
+        logger.warning(f"Repo {repo} not found for single PR extraction")
+        return 0
+
+    repo_id = repo_record["id"]
+
+    # Count existing rules before
+    existing_rules = await db.list_rules(repo_id=repo_id)
+    before_count = len(existing_rules)
+
+    # Run thread analyzer on this specific PR
+    analyzer_prompt = (
+        f"Analyze PR #{pr_number} in repository '{repo}'. "
+        f"Use github_fetch_comments with repo='{repo}', pr_number={pr_number}, github_token='{github_token}'. "
+        f"Extract knowledge rules and store them using store_knowledge with repo_id={repo_id}."
+    )
+    await _run_agent("thread-analyzer", analyzer_prompt, repo_id)
+
+    # Run synthesis against existing rules
+    synth_prompt = (
+        f"Synthesize all knowledge rules for repo_id={repo_id}. "
+        f"Rules come from multiple sources: pr, structure, docs, ci_fix, config. "
+        f"Apply cross-source prioritization, boost confidence for cross-source confirmations, "
+        f"merge duplicates, and remove generic rules."
+    )
+    await _run_agent("synthesizer", synth_prompt, repo_id)
+
+    # Check for new rules
+    after_rules = await db.list_rules(repo_id=repo_id)
+    new_rules = [r for r in after_rules if r["id"] > max((r2["id"] for r2 in existing_rules), default=0)]
+
+    # Create proposals for new rules
+    new_proposals = 0
+    for rule in new_rules:
+        await db.create_proposal(
+            rule_text=rule["rule_text"],
+            category=rule["category"],
+            confidence=rule["confidence"],
+            source_excerpt=f"Auto-extracted from merged PR #{pr_number}",
+            proposed_by="webhook",
+        )
+        new_proposals += 1
+
+    logger.info(f"Webhook extraction for PR #{pr_number}: {new_proposals} new proposals")
+    return new_proposals
 
 
 async def generate_claude_md(repo_id: int) -> str:

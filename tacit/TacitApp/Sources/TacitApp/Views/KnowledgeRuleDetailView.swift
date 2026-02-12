@@ -3,6 +3,8 @@ import SwiftUI
 struct KnowledgeRuleDetailView: View {
     let rule: KnowledgeRule
     @Bindable var vm: KnowledgeViewModel
+    @State private var feedbackScore: Int = 0
+    @State private var isSendingFeedback = false
 
     var body: some View {
         ScrollView {
@@ -10,6 +12,8 @@ struct KnowledgeRuleDetailView: View {
                 header
                 Divider()
                 ruleSection
+                Divider()
+                feedbackSection
                 Divider()
                 metadataSection
                 if let detail = vm.ruleDetail, !detail.decisionTrail.isEmpty {
@@ -19,6 +23,7 @@ struct KnowledgeRuleDetailView: View {
             }
             .padding(24)
         }
+        .onAppear { feedbackScore = rule.feedbackScore }
         .task {
             await vm.loadRuleDetail(id: rule.id)
         }
@@ -72,6 +77,57 @@ struct KnowledgeRuleDetailView: View {
         }
     }
 
+    private var feedbackSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Feedback", systemImage: "hand.thumbsup")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 16) {
+                Button {
+                    Task { await sendFeedback(vote: "up") }
+                } label: {
+                    Label("Helpful", systemImage: "hand.thumbsup.fill")
+                        .foregroundStyle(.green)
+                }
+                .buttonStyle(.bordered)
+                .disabled(isSendingFeedback)
+
+                Button {
+                    Task { await sendFeedback(vote: "down") }
+                } label: {
+                    Label("Not Helpful", systemImage: "hand.thumbsdown.fill")
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.bordered)
+                .disabled(isSendingFeedback)
+
+                Spacer()
+
+                HStack(spacing: 4) {
+                    Image(systemName: feedbackScore >= 0 ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
+                        .foregroundStyle(feedbackScore > 0 ? .green : feedbackScore < 0 ? .red : .secondary)
+                    Text("\(feedbackScore)")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(feedbackScore > 0 ? .green : feedbackScore < 0 ? .red : .secondary)
+                }
+            }
+        }
+    }
+
+    private func sendFeedback(vote: String) async {
+        isSendingFeedback = true
+        defer { isSendingFeedback = false }
+        do {
+            let updated = try await BackendService.shared.sendFeedback(ruleId: rule.id, vote: vote)
+            feedbackScore = updated.feedbackScore
+        } catch {
+            // Silently handle — feedback is non-critical
+        }
+    }
+
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Metadata", systemImage: "info.circle")
@@ -85,7 +141,7 @@ struct KnowledgeRuleDetailView: View {
             ], spacing: 12) {
                 MetadataCard(label: "Confidence", value: "\(Int(rule.confidence * 100))%", icon: "chart.bar.fill")
                 MetadataCard(label: "Category", value: KnowledgeViewModel.displayName(for: rule.category), icon: "tag.fill")
-                MetadataCard(label: "Source", value: rule.sourceType == .pr ? "Pull Request" : "Conversation", icon: "doc.fill")
+                MetadataCard(label: "Source", value: sourceDisplayName(rule.sourceType), icon: "doc.fill")
                 MetadataCard(label: "Created", value: rule.createdAt ?? "", icon: "calendar")
             }
         }
@@ -110,6 +166,17 @@ struct KnowledgeRuleDetailView: View {
         case "merged": return "arrow.triangle.merge"
         case "confidence_boost": return "arrow.up.circle.fill"
         default: return "circle.fill"
+        }
+    }
+
+    private func sourceDisplayName(_ type: KnowledgeRule.SourceType) -> String {
+        switch type {
+        case .pr: return "Pull Request"
+        case .conversation: return "Conversation"
+        case .structure: return "Repo Structure"
+        case .docs: return "Documentation"
+        case .cifix: return "CI Fix Pattern"
+        case .config: return "Config Analysis"
         }
     }
 

@@ -38,6 +38,8 @@ When merging duplicates across sources, the SOURCE determines which version to k
 
 When rules from different sources conflict, prefer the higher-authority source's version.
 
+**Historical note**: `ci_fix` and `config` source types have historically the highest user approval rates. Rules from these sources are strongly evidence-based and should be preferred when merging.
+
 ### Step 5: Cross-source confidence boosting
 
 - Rule found in 2+ sources → boost confidence by +0.10

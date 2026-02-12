@@ -150,13 +150,17 @@ struct ProposeSheet: View {
                 Button {
                     isSubmitting = true
                     Task {
-                        await proposalVM.createProposal(
-                            ruleText: discovery.ruleText,
+                        let rule = ContributeRule(
+                            rule_text: discovery.ruleText,
                             category: discovery.category,
                             confidence: discovery.confidence,
-                            sourceExcerpt: discovery.sourceExcerpt,
-                            proposedBy: NSFullUserName()
+                            source_excerpt: discovery.sourceExcerpt
                         )
+                        _ = try? await BackendService.shared.contribute(
+                            contributorName: NSFullUserName(),
+                            rules: [rule]
+                        )
+                        await proposalVM.loadProposals()
                         onProposed()
                         isSubmitting = false
                         dismiss()

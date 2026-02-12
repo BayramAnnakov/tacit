@@ -81,6 +81,22 @@ async def seeded_proposal():
     )
 
 
+@pytest.fixture(autouse=True)
+def mock_claude_similarity():
+    """Patch find_semantic_match to use SequenceMatcher fallback in tests.
+
+    This avoids real Claude API calls while preserving merge/create behavior.
+    Tests that need specific semantic match behavior can override this fixture.
+    """
+    from main import _sequencematcher_fallback
+
+    async def _mock_find(rule_text, pending_proposals):
+        return _sequencematcher_fallback(rule_text, pending_proposals)
+
+    with patch("main.find_semantic_match", side_effect=_mock_find) as mock:
+        yield mock
+
+
 @pytest.fixture
 def mock_run_agent():
     """Patch pipeline._run_agent to prevent Claude API calls."""

@@ -64,6 +64,14 @@ struct SidebarView: View {
                         .foregroundStyle(.purple)
                 }
                 .tag(SidebarItem.claudeMD)
+
+                Label {
+                    Text("Org Patterns")
+                } icon: {
+                    Image(systemName: "globe.americas.fill")
+                        .foregroundStyle(.indigo)
+                }
+                .tag(SidebarItem.orgPatterns)
             }
 
             Section("Live") {

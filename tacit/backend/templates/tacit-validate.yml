@@ -1,0 +1,41 @@
+name: Tacit PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR against team knowledge
+        env:
+          TACIT_URL: ${{ secrets.TACIT_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RESULT=$(curl -s -X POST "$TACIT_URL/api/validate-pr" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "repo": "${{ github.repository }}",
+              "pr_number": ${{ github.event.pull_request.number }},
+              "github_token": "'$GITHUB_TOKEN'"
+            }')
+
+          VIOLATIONS=$(echo "$RESULT" | jq '.total')
+
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            echo "::warning::Tacit found $VIOLATIONS potential rule violation(s)"
+            echo "$RESULT" | jq '.violations[] | "- \(.file): \(.reason)"'
+
+            # Post review comment
+            curl -s -X POST "$TACIT_URL/api/validate-pr/post-review" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"repo\": \"${{ github.repository }}\",
+                \"pr_number\": ${{ github.event.pull_request.number }},
+                \"github_token\": \"$GITHUB_TOKEN\",
+                \"violations\": $(echo "$RESULT" | jq '.violations')
+              }"
+          else
+            echo "No violations found"
+          fi

@@ -60,6 +60,8 @@ struct ContentView: View {
             ProposalListView(vm: proposalVM)
         case .claudeMD:
             ClaudeMDEditorView(repos: appVM.repos)
+        case .orgPatterns:
+            OrgPatternsView()
         case .extraction:
             ExtractionStreamView(vm: extractionVM, repos: appVM.repos)
         case .repo(let repo):

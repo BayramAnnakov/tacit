@@ -39,7 +39,7 @@ class KnowledgeRule(BaseModel):
     rule_text: str
     category: str = "general"
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
-    source_type: Literal["pr", "conversation", "structure", "docs", "ci_fix"] = "pr"
+    source_type: Literal["pr", "conversation", "structure", "docs", "ci_fix", "config"] = "pr"
     source_ref: str = ""
     repo_id: int | None = None
     created_at: datetime | None = None
@@ -92,3 +92,26 @@ class DecisionTrailEntry(BaseModel):
     description: str = ""
     source_ref: str = ""
     timestamp: datetime | None = None
+
+
+class PRValidationRequest(BaseModel):
+    """Request to validate a PR against knowledge rules."""
+    repo: str
+    pr_number: int
+    github_token: str
+    categories: list[str] | None = None
+
+
+class RuleViolation(BaseModel):
+    """A single rule violation found in a PR."""
+    rule_id: int
+    rule_text: str
+    file: str
+    reason: str
+
+
+class PRValidationResult(BaseModel):
+    """Result of PR validation."""
+    violations: list[RuleViolation]
+    total: int
+    files_checked: int
