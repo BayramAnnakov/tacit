@@ -135,11 +135,81 @@ final class BackendService {
         return try decoder.decode(KnowledgeRule.self, from: data)
     }
 
+    // MARK: - Hooks
+
+    func getHooksStatus() async throws -> HooksStatusResponse {
+        let data = try await get("/api/hooks/status")
+        return try decoder.decode(HooksStatusResponse.self, from: data)
+    }
+
+    func getHooksConfig() async throws -> HooksConfigResponse {
+        let data = try await get("/api/hooks/config")
+        return try decoder.decode(HooksConfigResponse.self, from: data)
+    }
+
+    func installHooks() async throws -> HooksInstallResponse {
+        let data = try await post("/api/hooks/install", body: Optional<String>.none)
+        return try decoder.decode(HooksInstallResponse.self, from: data)
+    }
+
+    // MARK: - Session Mining
+
+    func mineSessions() async throws -> MineSessionsResponse {
+        let data = try await post("/api/mine-sessions", body: Optional<String>.none)
+        return try decoder.decode(MineSessionsResponse.self, from: data)
+    }
+
+    func listSessions() async throws -> SessionsListResponse {
+        let data = try await get("/api/sessions")
+        return try decoder.decode(SessionsListResponse.self, from: data)
+    }
+
+    // MARK: - Onboarding
+
+    func generateOnboarding(name: String, role: String, repoIds: [Int], focusCategories: [String] = []) async throws -> OnboardingResponse {
+        struct Body: Encodable {
+            let developer_name: String
+            let role: String
+            let repo_ids: [Int]
+            let focus_categories: [String]
+        }
+        let data = try await post("/api/onboarding/generate", body: Body(
+            developer_name: name, role: role, repo_ids: repoIds, focus_categories: focusCategories
+        ))
+        return try decoder.decode(OnboardingResponse.self, from: data)
+    }
+
     // MARK: - Cross-Repo Intelligence
 
     func getCrossRepoPatterns() async throws -> CrossRepoResponse {
         let data = try await get("/api/knowledge/cross-repo")
         return try decoder.decode(CrossRepoResponse.self, from: data)
+    }
+
+    // MARK: - Outcome Metrics
+
+    func getOutcomeMetrics(repoId: Int, limit: Int = 12) async throws -> OutcomeMetricsResponse {
+        let data = try await get("/api/metrics/\(repoId)?limit=\(limit)")
+        return try decoder.decode(OutcomeMetricsResponse.self, from: data)
+    }
+
+    func collectMetrics(repoId: Int) async throws -> CollectMetricsResponse {
+        let data = try await post("/api/metrics/\(repoId)/collect", body: Optional<String>.none)
+        return try decoder.decode(CollectMetricsResponse.self, from: data)
+    }
+
+    // MARK: - Modular Rules
+
+    func getModularRules(repoId: Int) async throws -> ModularRulesResponse {
+        let data = try await get("/api/claude-rules/\(repoId)")
+        return try decoder.decode(ModularRulesResponse.self, from: data)
+    }
+
+    // MARK: - Health
+
+    func getHealth() async throws -> HealthResponse {
+        let data = try await get("/api/health")
+        return try decoder.decode(HealthResponse.self, from: data)
     }
 
     // MARK: - WebSocket
@@ -366,5 +436,220 @@ struct ContributeResult: Codable {
         case proposalId = "proposal_id"
         case contributorCount = "contributor_count"
         case similarityScore = "similarity_score"
+    }
+}
+
+// MARK: - Hooks Response Models
+
+struct MinedSession: Codable, Identifiable {
+    let id: Int
+    let path: String
+    let projectPath: String
+    let messageCount: Int
+    let rulesFound: Int
+    let lastMinedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, path
+        case projectPath = "project_path"
+        case messageCount = "message_count"
+        case rulesFound = "rules_found"
+        case lastMinedAt = "last_mined_at"
+    }
+}
+
+struct HooksStatusResponse: Codable {
+    let hookScriptExists: Bool
+    let hookScriptExecutable: Bool
+    let hookScriptPath: String
+    let installedInSettings: Bool
+    let recentCaptures: [MinedSession]
+
+    enum CodingKeys: String, CodingKey {
+        case hookScriptExists = "hook_script_exists"
+        case hookScriptExecutable = "hook_script_executable"
+        case hookScriptPath = "hook_script_path"
+        case installedInSettings = "installed_in_settings"
+        case recentCaptures = "recent_captures"
+    }
+}
+
+struct HooksConfigResponse: Codable {
+    let config: HookConfig
+    let hookScriptPath: String
+
+    enum CodingKeys: String, CodingKey {
+        case config
+        case hookScriptPath = "hook_script_path"
+    }
+}
+
+struct HookConfig: Codable {
+    let hooks: [String: [[String: [HookEntry]]]]
+}
+
+struct HookEntry: Codable {
+    let type: String
+    let command: String
+    let timeout: Int?
+}
+
+struct HooksInstallResponse: Codable {
+    let installed: Bool
+    let hookScriptPath: String
+    let settingsPath: String
+    let cleanupDisabled: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case installed
+        case hookScriptPath = "hook_script_path"
+        case settingsPath = "settings_path"
+        case cleanupDisabled = "cleanup_disabled"
+    }
+}
+
+// MARK: - Session Mining Response Models
+
+struct MineSessionsResponse: Codable {
+    let sessionsProcessed: Int
+    let sessionsSkipped: Int
+    let totalRulesFound: Int
+
+    enum CodingKeys: String, CodingKey {
+        case sessionsProcessed = "sessions_processed"
+        case sessionsSkipped = "sessions_skipped"
+        case totalRulesFound = "total_rules_found"
+    }
+}
+
+struct SessionsListResponse: Codable {
+    let sessions: [MinedSession]
+    let total: Int
+}
+
+// MARK: - Onboarding Response Model
+
+struct OnboardingResponse: Codable {
+    let developerName: String
+    let role: String
+    let content: String
+    let ruleCount: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case developerName = "developer_name"
+        case role, content
+        case ruleCount = "rule_count"
+    }
+}
+
+// MARK: - Outcome Metrics Response Models
+
+struct OutcomeMetric: Codable, Identifiable {
+    var id: String { weekStart }
+    let weekStart: String
+    let prRevisionRounds: Double
+    let ciFailureRate: Double
+    let reviewCommentDensity: Double
+    let timeToMergeHours: Double
+    let firstTimerTimeToMergeHours: Double
+    let rulesDeployed: Int
+
+    enum CodingKeys: String, CodingKey {
+        case weekStart = "week_start"
+        case prRevisionRounds = "pr_revision_rounds"
+        case ciFailureRate = "ci_failure_rate"
+        case reviewCommentDensity = "review_comment_density"
+        case timeToMergeHours = "time_to_merge_hours"
+        case firstTimerTimeToMergeHours = "first_timer_time_to_merge_hours"
+        case rulesDeployed = "rules_deployed"
+    }
+}
+
+struct OutcomeMetricsResponse: Codable {
+    let repo: String
+    let rulesDeployed: Int
+    let metrics: [OutcomeMetric]
+    let trend: [String: Double]
+
+    enum CodingKeys: String, CodingKey {
+        case repo
+        case rulesDeployed = "rules_deployed"
+        case metrics, trend
+    }
+}
+
+struct CollectMetricsResponse: Codable {
+    let collected: Bool
+    let metrics: [String: AnyCodableValue]?
+}
+
+// Simple wrapper for mixed-type JSON values
+enum AnyCodableValue: Codable {
+    case int(Int)
+    case double(Double)
+    case string(String)
+    case bool(Bool)
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let intVal = try? container.decode(Int.self) {
+            self = .int(intVal)
+        } else if let doubleVal = try? container.decode(Double.self) {
+            self = .double(doubleVal)
+        } else if let stringVal = try? container.decode(String.self) {
+            self = .string(stringVal)
+        } else if let boolVal = try? container.decode(Bool.self) {
+            self = .bool(boolVal)
+        } else {
+            self = .string("")
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .int(let v): try container.encode(v)
+        case .double(let v): try container.encode(v)
+        case .string(let v): try container.encode(v)
+        case .bool(let v): try container.encode(v)
+        }
+    }
+}
+
+// MARK: - Modular Rules Response
+
+struct ModularRulesResponse: Codable {
+    let repo: String
+    let files: [String: String]
+    let fileCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case repo, files
+        case fileCount = "file_count"
+    }
+}
+
+// MARK: - Health Response
+
+struct HealthResponse: Codable {
+    let status: String
+    let version: String
+    let repositories: Int
+    let totalRules: Int
+    let rulesBySource: [String: Int]
+    let pendingProposals: Int
+    let sessionsMined: Int
+    let hookInstalled: Bool
+    let hookScriptExists: Bool
+    let agents: Int
+
+    enum CodingKeys: String, CodingKey {
+        case status, version, repositories, agents
+        case totalRules = "total_rules"
+        case rulesBySource = "rules_by_source"
+        case pendingProposals = "pending_proposals"
+        case sessionsMined = "sessions_mined"
+        case hookInstalled = "hook_installed"
+        case hookScriptExists = "hook_script_exists"
     }
 }

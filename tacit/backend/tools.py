@@ -580,6 +580,235 @@ async def github_fetch_pr_diff(args: dict) -> dict:
     return {"content": [{"type": "text", "text": json.dumps(files, indent=2)}]}
 
 
+# --------------- Anti-Pattern Mining Tools ---------------
+
+# Minimum review comments for a PR to be worth sending to Claude for analysis.
+# PRs with fewer comments rarely contain meaningful correction patterns.
+_MIN_REVIEW_COMMENTS = 3
+
+
+@tool(
+    name="github_fetch_rejected_patterns",
+    description="Fetch PRs with substantive review discussions for anti-pattern analysis. Selects PRs with CHANGES_REQUESTED reviews OR those with 3+ inline review comments (indicating code-level feedback). Returns all review comments, diff hunks, and review bodies so the anti-pattern-miner agent can use LLM judgment to identify rejection/correction patterns.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "repo": {"type": "string", "description": "Full repo name e.g. 'owner/repo'"},
+            "github_token": {"type": "string", "description": "GitHub API token"},
+            "max_prs": {"type": "integer", "description": "Max PRs to scan (default 30)", "default": 30},
+        },
+        "required": ["repo", "github_token"],
+    },
+)
+async def github_fetch_rejected_patterns(args: dict) -> dict:
+    repo = args["repo"]
+    token = args["github_token"]
+    max_prs = min(args.get("max_prs", 30), 50)
+    headers = _gh_headers(token)
+
+    patterns: list[dict] = []
+
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        # Fetch recent closed PRs (merged ones have review trails too)
+        pr_resp = await client.get(
+            f"https://api.github.com/repos/{repo}/pulls",
+            params={"state": "closed", "per_page": max_prs, "sort": "updated", "direction": "desc"},
+            headers=headers, timeout=30,
+        )
+        if pr_resp.status_code != 200:
+            return {"content": [{"type": "text", "text": f"GitHub API error {pr_resp.status_code}: {pr_resp.text}"}], "is_error": True}
+
+        prs = pr_resp.json()
+
+        for pr in prs:
+            pr_num = pr["number"]
+
+            # Fetch reviews for this PR
+            rev_resp = await client.get(
+                f"https://api.github.com/repos/{repo}/pulls/{pr_num}/reviews",
+                headers=headers, params={"per_page": 20}, timeout=15,
+            )
+            if rev_resp.status_code != 200:
+                continue
+
+            reviews = rev_resp.json()
+            changes_requested = [r for r in reviews if r.get("state") == "CHANGES_REQUESTED"]
+            has_formal_rejection = len(changes_requested) > 0
+
+            # Fetch inline review comments (code-level feedback)
+            comments_resp = await client.get(
+                f"https://api.github.com/repos/{repo}/pulls/{pr_num}/comments",
+                headers=headers, params={"per_page": 50}, timeout=15,
+            )
+            if comments_resp.status_code != 200:
+                continue
+
+            raw_comments = comments_resp.json()
+
+            # Selection gate: include PR if it has formal CHANGES_REQUESTED
+            # OR enough inline review comments to indicate substantive discussion.
+            # No regex filtering — let the Claude agent decide what's a rejection.
+            if not has_formal_rejection and len(raw_comments) < _MIN_REVIEW_COMMENTS:
+                continue
+
+            # Pass ALL review comments to the agent for LLM-based classification
+            review_comments = []
+            for c in raw_comments:
+                body = c.get("body", "")
+                review_comments.append({
+                    "author": c["user"]["login"],
+                    "body": body[:500],
+                    "path": c.get("path", ""),
+                    "diff_hunk": (c.get("diff_hunk") or "")[:400],
+                    "has_suggestion_block": "```suggestion" in body,
+                })
+
+            # Collect all review-level bodies (top-level review summaries)
+            review_bodies = []
+            for r in reviews:
+                body = (r.get("body") or "").strip()
+                if body:
+                    review_bodies.append({
+                        "author": r["user"]["login"],
+                        "state": r.get("state", ""),
+                        "body": body[:500],
+                    })
+
+            patterns.append({
+                "pr_number": pr_num,
+                "pr_title": pr["title"],
+                "pr_url": pr.get("html_url", f"https://github.com/{repo}/pull/{pr_num}"),
+                "author": pr["user"]["login"],
+                "merged": pr.get("merged_at") is not None,
+                "has_formal_rejection": has_formal_rejection,
+                "review_bodies": review_bodies,
+                "inline_review_comments": review_comments[:20],
+                "total_review_comments": len(raw_comments),
+                "review_rounds": len(reviews),
+            })
+
+            if len(patterns) >= 10:
+                break
+
+    if not patterns:
+        return {"content": [{"type": "text", "text": "No rejection patterns found in recent PRs."}]}
+
+    return {"content": [{"type": "text", "text": json.dumps(patterns, indent=2)}]}
+
+
+# --------------- Outcome Metrics Tools ---------------
+
+@tool(
+    name="github_fetch_outcome_metrics",
+    description="Fetch PR and CI metrics for a repository over a given time period. Returns average review rounds, CI failure rate, comment density, and time-to-merge.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "repo": {"type": "string", "description": "Full repo name e.g. 'owner/repo'"},
+            "github_token": {"type": "string", "description": "GitHub API token"},
+            "days": {"type": "integer", "description": "Number of days to look back (default 14)", "default": 14},
+        },
+        "required": ["repo", "github_token"],
+    },
+)
+async def github_fetch_outcome_metrics(args: dict) -> dict:
+    repo = args["repo"]
+    token = args["github_token"]
+    days = min(args.get("days", 14), 90)
+    headers = _gh_headers(token)
+
+    from datetime import datetime, timezone, timedelta
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+    metrics = {
+        "period_days": days,
+        "total_prs": 0,
+        "avg_review_rounds": 0.0,
+        "ci_failure_rate": 0.0,
+        "avg_comments_per_pr": 0.0,
+        "avg_time_to_merge_hours": 0.0,
+        "first_timer_avg_ttm_hours": 0.0,
+    }
+
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        # Fetch merged PRs in the period
+        pr_resp = await client.get(
+            f"https://api.github.com/repos/{repo}/pulls",
+            params={"state": "closed", "per_page": 50, "sort": "updated", "direction": "desc"},
+            headers=headers, timeout=30,
+        )
+        if pr_resp.status_code != 200:
+            return {"content": [{"type": "text", "text": f"GitHub API error {pr_resp.status_code}"}], "is_error": True}
+
+        prs = [p for p in pr_resp.json() if p.get("merged_at") and p.get("created_at", "") >= since]
+        metrics["total_prs"] = len(prs)
+
+        if not prs:
+            return {"content": [{"type": "text", "text": json.dumps(metrics, indent=2)}]}
+
+        # Count author frequency for first-timer detection
+        author_counts: Counter = Counter()
+        for p in pr_resp.json():
+            author_counts[p["user"]["login"]] += 1
+
+        total_comments = 0
+        total_review_rounds = 0
+        total_ttm = 0.0
+        first_timer_ttms: list[float] = []
+        ci_failures = 0
+        ci_total = 0
+
+        for pr in prs[:30]:  # Limit API calls
+            pr_num = pr["number"]
+            total_comments += pr.get("comments", 0) + pr.get("review_comments", 0)
+
+            # Count review rounds
+            rev_resp = await client.get(
+                f"https://api.github.com/repos/{repo}/pulls/{pr_num}/reviews",
+                headers=headers, params={"per_page": 10}, timeout=15,
+            )
+            if rev_resp.status_code == 200:
+                total_review_rounds += len(rev_resp.json())
+
+            # Time to merge
+            created = datetime.fromisoformat(pr["created_at"].replace("Z", "+00:00"))
+            merged = datetime.fromisoformat(pr["merged_at"].replace("Z", "+00:00"))
+            ttm_hours = (merged - created).total_seconds() / 3600
+            total_ttm += ttm_hours
+
+            if author_counts[pr["user"]["login"]] <= 2:
+                first_timer_ttms.append(ttm_hours)
+
+            # Check CI status on head commit
+            commits_resp = await client.get(
+                f"https://api.github.com/repos/{repo}/pulls/{pr_num}/commits",
+                headers=headers, params={"per_page": 1}, timeout=10,
+            )
+            if commits_resp.status_code == 200:
+                commits = commits_resp.json()
+                if commits:
+                    sha = commits[-1]["sha"]
+                    checks_resp = await client.get(
+                        f"https://api.github.com/repos/{repo}/commits/{sha}/check-runs",
+                        headers=headers, params={"per_page": 5}, timeout=10,
+                    )
+                    if checks_resp.status_code == 200:
+                        runs = checks_resp.json().get("check_runs", [])
+                        ci_total += len(runs)
+                        ci_failures += sum(1 for r in runs if r.get("conclusion") == "failure")
+
+        n = len(prs[:30])
+        metrics["avg_review_rounds"] = round(total_review_rounds / n, 2) if n else 0
+        metrics["avg_comments_per_pr"] = round(total_comments / n, 2) if n else 0
+        metrics["avg_time_to_merge_hours"] = round(total_ttm / n, 1) if n else 0
+        metrics["ci_failure_rate"] = round(ci_failures / ci_total, 3) if ci_total else 0
+        metrics["first_timer_avg_ttm_hours"] = round(
+            sum(first_timer_ttms) / len(first_timer_ttms), 1
+        ) if first_timer_ttms else 0
+
+    return {"content": [{"type": "text", "text": json.dumps(metrics, indent=2)}]}
+
+
 # --------------- Local Log Tools ---------------
 
 @tool(
@@ -647,16 +876,19 @@ async def read_claude_logs(args: dict) -> dict:
 
 @tool(
     name="store_knowledge",
-    description="Store an extracted knowledge rule in the database. Returns the created rule with its ID.",
+    description="Store an extracted knowledge rule in the database. Returns the created rule with its ID. Supports provenance tracking and path-scoped rules.",
     input_schema={
         "type": "object",
         "properties": {
             "rule_text": {"type": "string", "description": "The knowledge rule text"},
             "category": {"type": "string", "description": "Category: architecture, testing, style, workflow, security, performance, general"},
             "confidence": {"type": "number", "description": "Confidence score 0.0-1.0"},
-            "source_type": {"type": "string", "description": "Source type: 'pr' or 'conversation'"},
+            "source_type": {"type": "string", "description": "Source type: 'pr', 'conversation', 'structure', 'docs', 'ci_fix', 'config', 'anti_pattern'"},
             "source_ref": {"type": "string", "description": "Reference to the source (PR URL or log path)"},
             "repo_id": {"type": "integer", "description": "Repository ID (optional)"},
+            "provenance_url": {"type": "string", "description": "URL to the source PR/discussion/CI run (optional)"},
+            "provenance_summary": {"type": "string", "description": "Brief explanation of WHY this rule exists — what happened that led to it (optional)"},
+            "applicable_paths": {"type": "string", "description": "Comma-separated glob patterns for files this rule applies to, e.g. 'src/api/**/*.ts,src/db/**'. Empty means applies everywhere. (optional)"},
         },
         "required": ["rule_text", "category", "confidence", "source_type", "source_ref"],
     },
@@ -669,14 +901,20 @@ async def store_knowledge(args: dict) -> dict:
         source_type=args["source_type"],
         source_ref=args["source_ref"],
         repo_id=args.get("repo_id"),
+        provenance_url=args.get("provenance_url", ""),
+        provenance_summary=args.get("provenance_summary", ""),
+        applicable_paths=args.get("applicable_paths", ""),
     )
 
     # Add decision trail entry
     if rule.get("id"):
+        desc = f"Extracted from {args['source_type']} source"
+        if args.get("provenance_summary"):
+            desc += f" — {args['provenance_summary'][:200]}"
         await db.add_trail_entry(
             rule_id=rule["id"],
             event_type="created",
-            description=f"Extracted from {args['source_type']} source",
+            description=desc,
             source_ref=args["source_ref"],
         )
 
@@ -762,6 +1000,8 @@ def create_tacit_tools_server():
             github_fetch_ci_fixes,
             github_fetch_code_samples,
             github_fetch_pr_diff,
+            github_fetch_rejected_patterns,
+            github_fetch_outcome_metrics,
             read_claude_logs,
             store_knowledge,
             search_knowledge,
@@ -780,6 +1020,8 @@ _RAW_TOOL_NAMES = [
     "github_fetch_ci_fixes",
     "github_fetch_code_samples",
     "github_fetch_pr_diff",
+    "github_fetch_rejected_patterns",
+    "github_fetch_outcome_metrics",
     "read_claude_logs",
     "store_knowledge",
     "search_knowledge",

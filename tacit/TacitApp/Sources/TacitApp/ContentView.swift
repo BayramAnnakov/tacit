@@ -64,6 +64,12 @@ struct ContentView: View {
             OrgPatternsView()
         case .extraction:
             ExtractionStreamView(vm: extractionVM, repos: appVM.repos)
+        case .hooks:
+            HooksSetupView()
+        case .metrics:
+            MetricsView(repos: appVM.repos)
+        case .health:
+            HealthView()
         case .repo(let repo):
             KnowledgeBrowserView(vm: knowledgeVM, repoId: repo.id)
         case nil:

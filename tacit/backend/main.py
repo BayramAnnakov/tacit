@@ -16,7 +16,11 @@ from pydantic import BaseModel
 
 import database as db
 import proposals as prop
-from pipeline import run_extraction, run_local_extraction, generate_claude_md, run_single_pr_extraction
+from pipeline import (
+    run_extraction, run_local_extraction, generate_claude_md,
+    run_single_pr_extraction, mine_session, mine_all_sessions,
+    incremental_extract, collect_outcome_metrics, generate_modular_rules,
+)
 from config import settings
 from models import ExtractionEvent, PRValidationRequest, RuleViolation, PRValidationResult
 
@@ -351,6 +355,19 @@ class ContributionPayload(BaseModel):
     rules: list[ContributedRule]
     project_hint: str = ""  # "owner/repo" from git remote
     client_version: str = ""
+
+
+class HookCaptureRequest(BaseModel):
+    transcript_path: str
+    cwd: str = ""
+    session_id: str = ""
+
+
+class OnboardingRequest(BaseModel):
+    developer_name: str
+    role: str = "developer"
+    repo_ids: list[int] = []
+    focus_categories: list[str] = []
 
 
 # --------------- Helpers ---------------
@@ -802,6 +819,84 @@ async def create_claude_md_pr(repo_id: int, body: CreatePRRequest):
         }
 
 
+# --------------- Modular Rules Generation ---------------
+
+@app.get("/api/claude-rules/{repo_id}")
+async def get_modular_rules(repo_id: int):
+    """Generate a .claude/rules/ directory structure from the knowledge base."""
+    repo = await db.get_repo(repo_id)
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    files = await generate_modular_rules(repo_id)
+    return {"repo": repo["full_name"], "files": files, "file_count": len(files)}
+
+
+# --------------- Outcome Metrics ---------------
+
+@app.get("/api/metrics/{repo_id}")
+async def get_outcome_metrics(repo_id: int, limit: int = Query(12)):
+    """Get historical outcome metrics for a repository."""
+    repo = await db.get_repo(repo_id)
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    metrics = await db.list_outcome_metrics(repo_id, limit=limit)
+    rules_count = len(await db.list_rules(repo_id=repo_id))
+
+    # Compute trend if we have at least 2 data points
+    trend = {}
+    if len(metrics) >= 2:
+        latest = metrics[0]
+        previous = metrics[1]
+        for key in ["pr_revision_rounds", "ci_failure_rate", "review_comment_density", "time_to_merge_hours"]:
+            prev_val = previous.get(key, 0)
+            curr_val = latest.get(key, 0)
+            if prev_val > 0:
+                trend[key] = round((curr_val - prev_val) / prev_val * 100, 1)
+
+    return {
+        "repo": repo["full_name"],
+        "rules_deployed": rules_count,
+        "metrics": metrics,
+        "trend": trend,
+    }
+
+
+@app.post("/api/metrics/{repo_id}/collect")
+async def collect_metrics(repo_id: int):
+    """Trigger outcome metrics collection for a repository."""
+    repo = await db.get_repo(repo_id)
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    token = repo.get("github_token") or settings.GITHUB_TOKEN
+    if not token:
+        raise HTTPException(status_code=400, detail="GitHub token required")
+
+    metrics = await collect_outcome_metrics(repo["full_name"], token, repo_id)
+
+    if metrics:
+        from datetime import datetime, timezone, timedelta
+        # Use Monday of current week as week_start
+        now = datetime.now(timezone.utc)
+        week_start = (now - timedelta(days=now.weekday())).strftime("%Y-%m-%d")
+        rules_count = len(await db.list_rules(repo_id=repo_id))
+
+        await db.upsert_outcome_metrics(
+            repo_id=repo_id,
+            week_start=week_start,
+            pr_revision_rounds=metrics.get("avg_review_rounds", 0),
+            ci_failure_rate=metrics.get("ci_failure_rate", 0),
+            review_comment_density=metrics.get("avg_comments_per_pr", 0),
+            time_to_merge_hours=metrics.get("avg_time_to_merge_hours", 0),
+            first_timer_time_to_merge_hours=metrics.get("first_timer_avg_ttm_hours", 0),
+            rules_deployed=rules_count,
+        )
+
+    return {"collected": True, "metrics": metrics}
+
+
 # --------------- Local Extraction ---------------
 
 @app.post("/api/local-extract")
@@ -871,14 +966,21 @@ async def github_webhook(request: Request):
 
 
 async def _webhook_extraction_background(repo: str, pr_number: int, token: str):
-    """Run single PR extraction from webhook and broadcast events."""
+    """Run incremental PR extraction from webhook and broadcast events."""
     try:
-        new_count = await run_single_pr_extraction(repo, pr_number, token)
+        result = await incremental_extract(repo, pr_number, token)
+        new_rules = result.get("new_rules", 0)
+        new_proposals = result.get("new_proposals", 0)
+        msg = f"Webhook: PR #{pr_number} in {repo} → {new_rules} auto-approved rules, {new_proposals} proposals"
         await broadcast_event(ExtractionEvent(
             event_type="progress",
             stage="webhook",
-            message=f"Webhook: {new_count} new proposals from PR #{pr_number} in {repo}",
-            data={"pr_number": pr_number, "new_proposals": new_count},
+            message=msg,
+            data={
+                "pr_number": pr_number,
+                "new_rules": new_rules,
+                "new_proposals": new_proposals,
+            },
         ))
     except Exception as e:
         logger.exception(f"Webhook extraction error: {e}")
@@ -1040,12 +1142,20 @@ async def post_pr_review(body: dict):
     if not violations:
         return {"message": "No violations to post"}
 
-    # Format review body
+    # Format review body with provenance
     review_body = "## Tacit Knowledge Review\n\n"
     review_body += f"Found **{len(violations)}** potential rule violation(s):\n\n"
     for v in violations:
         review_body += f"- **{v.get('file', 'unknown')}**: {v.get('reason', '')}\n"
-        review_body += f"  - Rule: _{v.get('rule_text', '')}_\n\n"
+        review_body += f"  - Rule: _{v.get('rule_text', '')}_\n"
+        # Include provenance if available
+        rule_id = v.get("rule_id")
+        if rule_id:
+            rule = await db.get_rule(rule_id)
+            if rule and rule.get("provenance_url"):
+                review_body += f"  - Why: {rule.get('provenance_summary', 'See source')} "
+                review_body += f"([source]({rule['provenance_url']}))\n"
+        review_body += "\n"
 
     headers = {
         "Authorization": f"token {token}",
@@ -1071,11 +1181,377 @@ async def post_pr_review(body: dict):
         }
 
 
-# --------------- Health ---------------
+# --------------- Hooks (Feature 1) ---------------
+
+@app.post("/api/hooks/capture")
+async def hooks_capture(body: HookCaptureRequest):
+    """Receive a session transcript from the Claude Code hook and mine it for knowledge."""
+    asyncio.create_task(_hook_capture_background(body.transcript_path, body.cwd))
+    return {"accepted": True, "transcript_path": body.transcript_path}
+
+
+async def _hook_capture_background(transcript_path: str, cwd: str):
+    """Mine a session transcript in the background (called by hook)."""
+    try:
+        result = await mine_session(transcript_path, cwd)
+        if result.get("rules_found", 0) > 0:
+            await broadcast_event(ExtractionEvent(
+                event_type="progress",
+                stage="hook_capture",
+                message=f"Hook captured {result['rules_found']} rule(s) from session",
+                data={"rules_found": result["rules_found"], "path": transcript_path},
+            ))
+    except Exception as e:
+        logger.exception(f"Hook capture error: {e}")
+
+
+@app.get("/api/hooks/config")
+async def hooks_config():
+    """Return a ready-to-use Claude Code hook configuration JSON."""
+    import os
+    hook_script = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "hooks", "tacit-capture.sh")
+    )
+    config = {
+        "hooks": {
+            "Stop": [
+                {
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": hook_script,
+                            "timeout": 30,
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+    return {"config": config, "hook_script_path": hook_script}
+
+
+@app.get("/api/hooks/status")
+async def hooks_status():
+    """Check whether the hook script exists and is executable."""
+    import os
+    hook_script = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "hooks", "tacit-capture.sh")
+    )
+    exists = os.path.isfile(hook_script)
+    executable = os.access(hook_script, os.X_OK) if exists else False
+
+    # Check if Claude Code settings reference our hook
+    settings_path = os.path.expanduser("~/.claude/settings.json")
+    installed = False
+    if os.path.isfile(settings_path):
+        try:
+            with open(settings_path) as f:
+                claude_settings = json.load(f)
+            hooks = claude_settings.get("hooks", {})
+            stop_hooks = hooks.get("Stop", [])
+            for hook_group in stop_hooks:
+                for hook in hook_group.get("hooks", []):
+                    if hook.get("command", "").endswith("tacit-capture.sh"):
+                        installed = True
+                        break
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    # Get recently captured rules
+    recent_sessions = await db.list_mined_sessions()
+
+    return {
+        "hook_script_exists": exists,
+        "hook_script_executable": executable,
+        "hook_script_path": hook_script,
+        "installed_in_settings": installed,
+        "recent_captures": recent_sessions[:10],
+    }
+
+
+@app.post("/api/hooks/install")
+async def hooks_install():
+    """Install the hook script into Claude Code settings."""
+    import os
+    hook_script = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "hooks", "tacit-capture.sh")
+    )
+
+    # Ensure hook script exists and is executable
+    if not os.path.isfile(hook_script):
+        raise HTTPException(status_code=500, detail="Hook script not found")
+    os.chmod(hook_script, 0o755)
+
+    # Read or create Claude Code settings
+    settings_path = os.path.expanduser("~/.claude/settings.json")
+    os.makedirs(os.path.dirname(settings_path), exist_ok=True)
+
+    claude_settings = {}
+    if os.path.isfile(settings_path):
+        try:
+            with open(settings_path) as f:
+                claude_settings = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    # Add hook config
+    hooks = claude_settings.setdefault("hooks", {})
+    stop_hooks = hooks.setdefault("Stop", [])
+
+    # Check if already installed
+    already_installed = False
+    for hook_group in stop_hooks:
+        for hook in hook_group.get("hooks", []):
+            if hook.get("command", "").endswith("tacit-capture.sh"):
+                already_installed = True
+                break
+
+    if not already_installed:
+        stop_hooks.append({
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": hook_script,
+                    "timeout": 30,
+                }
+            ]
+        })
+
+    # Prevent conversation cleanup (preserve transcripts for mining)
+    claude_settings["cleanupPeriodDays"] = 99999
+
+    with open(settings_path, "w") as f:
+        json.dump(claude_settings, f, indent=2)
+
+    return {
+        "installed": True,
+        "hook_script_path": hook_script,
+        "settings_path": settings_path,
+        "cleanup_disabled": True,
+    }
+
+
+# --------------- Session Mining (Feature 2) ---------------
+
+@app.post("/api/mine-sessions")
+async def mine_sessions_endpoint():
+    """Scan all Claude Code sessions and extract knowledge from transcripts."""
+    results = await mine_all_sessions()
+
+    total_rules = sum(r.get("rules_found", 0) for r in results)
+    skipped = sum(1 for r in results if r.get("skipped"))
+
+    await broadcast_event(ExtractionEvent(
+        event_type="progress",
+        stage="session_mining",
+        message=f"Mined {len(results)} sessions, found {total_rules} rules ({skipped} skipped)",
+        data={"sessions": len(results), "rules_found": total_rules, "skipped": skipped},
+    ))
+
+    return {
+        "sessions_processed": len(results),
+        "sessions_skipped": skipped,
+        "total_rules_found": total_rules,
+        "results": results,
+    }
+
+
+@app.get("/api/sessions")
+async def list_sessions():
+    """List discovered sessions with metadata."""
+    sessions = await db.list_mined_sessions()
+    return {"sessions": sessions, "total": len(sessions)}
+
+
+# --------------- Auto-Onboarding (Feature 4) ---------------
+
+@app.post("/api/onboarding/generate")
+async def generate_onboarding(body: OnboardingRequest):
+    """Generate a personalized onboarding guide for a new developer."""
+    # Gather all rules for the specified repos
+    all_rules = []
+    if body.repo_ids:
+        for repo_id in body.repo_ids:
+            rules = await db.list_rules(repo_id=repo_id)
+            all_rules.extend(rules)
+    else:
+        all_rules = await db.list_rules()
+
+    # Filter by focus categories if specified
+    if body.focus_categories:
+        all_rules = [r for r in all_rules if r["category"] in body.focus_categories]
+
+    if not all_rules:
+        return {
+            "developer_name": body.developer_name,
+            "role": body.role,
+            "content": f"# Onboarding Guide for {body.developer_name}\n\nNo knowledge rules found for the specified repositories. Run an extraction first.",
+            "sections": [],
+        }
+
+    # Try Claude-powered personalization
+    content = None
+    if settings.ANTHROPIC_API_KEY:
+        try:
+            content = await _generate_onboarding_with_claude(body, all_rules)
+        except Exception as e:
+            logger.warning(f"Claude onboarding generation failed, using template: {e}")
+
+    # Fallback: template-based generation
+    if not content:
+        content = _generate_onboarding_template(body, all_rules)
+
+    return {
+        "developer_name": body.developer_name,
+        "role": body.role,
+        "content": content,
+        "rule_count": len(all_rules),
+    }
+
+
+async def _generate_onboarding_with_claude(body: OnboardingRequest, rules: list[dict]) -> str | None:
+    """Use Claude to generate a personalized onboarding guide."""
+    from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessage, ResultMessage, TextBlock
+
+    rules_text = json.dumps([
+        {"rule_text": r["rule_text"], "category": r["category"],
+         "confidence": r["confidence"], "source_type": r["source_type"],
+         "feedback_score": r.get("feedback_score", 0)}
+        for r in rules
+    ], indent=2)
+
+    system_prompt = (
+        "You are an onboarding guide generator. Given a set of team knowledge rules "
+        "and a new developer's profile, create a warm, structured onboarding document. "
+        "Organize rules into three tiers: Critical (must know), Important (should know), "
+        "and Good to Know. Group by category. Write natural intro paragraphs. "
+        "Highlight potential gotchas. Use markdown formatting."
+    )
+
+    user_prompt = (
+        f"Generate an onboarding guide for {body.developer_name} "
+        f"(role: {body.role}).\n\n"
+        f"Team knowledge rules:\n{rules_text}\n\n"
+        f"Focus categories: {body.focus_categories or 'all'}\n\n"
+        f"Create a structured onboarding document with:\n"
+        f"1. Welcome section mentioning their role\n"
+        f"2. Critical rules (confidence >= 0.9 or feedback_score >= 3)\n"
+        f"3. Important conventions (confidence >= 0.7)\n"
+        f"4. Good to know (the rest)\n"
+        f"5. Common gotchas section\n"
+        f"Use markdown formatting."
+    )
+
+    options = ClaudeAgentOptions(
+        system_prompt=system_prompt,
+        model="sonnet",
+        mcp_servers={},
+        allowed_tools=[],
+        permission_mode="bypassPermissions",
+        max_turns=1,
+    )
+
+    result_text = []
+    client = ClaudeSDKClient(options=options)
+    await client.connect()
+    try:
+        await client.query(user_prompt)
+        async for message in client.receive_response():
+            if isinstance(message, ResultMessage) and message.is_error:
+                logger.error(f"Onboarding generation error: {message.result}")
+                return None
+            elif isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        result_text.append(block.text)
+    finally:
+        await client.disconnect()
+
+    return "\n".join(result_text)
+
+
+def _generate_onboarding_template(body: OnboardingRequest, rules: list[dict]) -> str:
+    """Generate a template-based onboarding document (fallback)."""
+    lines = [
+        f"# Onboarding Guide for {body.developer_name}",
+        f"\nWelcome to the team, {body.developer_name}! As a **{body.role}**, "
+        f"here's what you need to know based on our team's extracted knowledge.\n",
+    ]
+
+    # Categorize rules into tiers
+    critical = [r for r in rules if r["confidence"] >= 0.9 or r.get("feedback_score", 0) >= 3]
+    important = [r for r in rules if r not in critical and r["confidence"] >= 0.7]
+    good_to_know = [r for r in rules if r not in critical and r not in important]
+
+    def _section(title: str, tier_rules: list[dict]):
+        if not tier_rules:
+            return
+        lines.append(f"\n## {title}\n")
+        by_category: dict[str, list[dict]] = {}
+        for r in tier_rules:
+            by_category.setdefault(r["category"], []).append(r)
+        for cat, cat_rules in sorted(by_category.items()):
+            lines.append(f"\n### {cat.title()}\n")
+            for r in sorted(cat_rules, key=lambda x: -x["confidence"]):
+                conf = f" *(confidence: {r['confidence']:.0%})*"
+                lines.append(f"- {r['rule_text']}{conf}")
+
+    _section("Critical — You Must Know These", critical)
+    _section("Important — Your Team Expects These", important)
+    _section("Good to Know — Context for Later", good_to_know)
+
+    lines.append("\n---\n*Generated by Tacit from team knowledge rules.*\n")
+    return "\n".join(lines)
+
+
+# --------------- Health Dashboard ---------------
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "0.1.0"}
+    """Comprehensive health check with system status."""
+    import os
+
+    # Check hook installation
+    hook_script = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "hooks", "tacit-capture.sh")
+    )
+    hook_installed = False
+    settings_path = os.path.expanduser("~/.claude/settings.json")
+    if os.path.isfile(settings_path):
+        try:
+            with open(settings_path) as f:
+                claude_settings = json.load(f)
+            for hook_group in claude_settings.get("hooks", {}).get("Stop", []):
+                for hook in hook_group.get("hooks", []):
+                    if hook.get("command", "").endswith("tacit-capture.sh"):
+                        hook_installed = True
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    # Count data
+    repos = await db.list_repos()
+    all_rules = await db.list_rules()
+    pending_proposals = await db.list_proposals(status="pending")
+    sessions = await db.list_mined_sessions()
+
+    # Rules by source type
+    source_counts: dict[str, int] = {}
+    for rule in all_rules:
+        st = rule.get("source_type", "unknown")
+        source_counts[st] = source_counts.get(st, 0) + 1
+
+    return {
+        "status": "ok",
+        "version": "2.0.0",
+        "repositories": len(repos),
+        "total_rules": len(all_rules),
+        "rules_by_source": source_counts,
+        "pending_proposals": len(pending_proposals),
+        "sessions_mined": len(sessions),
+        "hook_installed": hook_installed,
+        "hook_script_exists": os.path.isfile(hook_script),
+        "agents": 14,  # 11 original + 3 new
+    }
 
 
 if __name__ == "__main__":

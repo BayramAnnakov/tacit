@@ -39,7 +39,7 @@ class KnowledgeRule(BaseModel):
     rule_text: str
     category: str = "general"
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
-    source_type: Literal["pr", "conversation", "structure", "docs", "ci_fix", "config"] = "pr"
+    source_type: Literal["pr", "conversation", "structure", "docs", "ci_fix", "config", "anti_pattern"] = "pr"
     source_ref: str = ""
     repo_id: int | None = None
     created_at: datetime | None = None
@@ -108,6 +108,8 @@ class RuleViolation(BaseModel):
     rule_text: str
     file: str
     reason: str
+    provenance_url: str = ""
+    provenance_summary: str = ""
 
 
 class PRValidationResult(BaseModel):

@@ -9,6 +9,9 @@ enum SidebarItem: Hashable {
     case orgPatterns
     case repo(Repository)
     case extraction
+    case hooks
+    case metrics
+    case health
 }
 
 @Observable

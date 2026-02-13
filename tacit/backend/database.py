@@ -81,6 +81,29 @@ CREATE TABLE IF NOT EXISTS proposal_contributions (
     similarity_score REAL NOT NULL DEFAULT 1.0,
     contributed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS mined_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    path TEXT NOT NULL UNIQUE,
+    project_path TEXT NOT NULL DEFAULT '',
+    message_count INTEGER NOT NULL DEFAULT 0,
+    rules_found INTEGER NOT NULL DEFAULT 0,
+    last_mined_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS outcome_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repo_id INTEGER NOT NULL REFERENCES repositories(id),
+    week_start TEXT NOT NULL,
+    pr_revision_rounds REAL NOT NULL DEFAULT 0,
+    ci_failure_rate REAL NOT NULL DEFAULT 0,
+    review_comment_density REAL NOT NULL DEFAULT 0,
+    time_to_merge_hours REAL NOT NULL DEFAULT 0,
+    first_timer_time_to_merge_hours REAL NOT NULL DEFAULT 0,
+    rules_deployed INTEGER NOT NULL DEFAULT 0,
+    measured_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(repo_id, week_start)
+);
 """
 
 
@@ -99,10 +122,15 @@ async def init_db() -> None:
     try:
         await db.executescript(SCHEMA)
         await db.commit()
-        # Idempotent ALTER migrations for federated contributions
+        # Idempotent ALTER migrations
         for alter in [
             "ALTER TABLE proposals ADD COLUMN contributor_count INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE proposals ADD COLUMN repo_id INTEGER REFERENCES repositories(id)",
+            # Improvement 4: Provenance tracking
+            "ALTER TABLE knowledge_rules ADD COLUMN provenance_url TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE knowledge_rules ADD COLUMN provenance_summary TEXT NOT NULL DEFAULT ''",
+            # Improvement 5: Path-scoped rules
+            "ALTER TABLE knowledge_rules ADD COLUMN applicable_paths TEXT NOT NULL DEFAULT ''",
         ]:
             try:
                 await db.execute(alter)
@@ -177,13 +205,18 @@ async def list_team_members() -> list[dict]:
 # --------------- Knowledge Rules ---------------
 
 async def insert_rule(rule_text: str, category: str, confidence: float,
-                      source_type: str, source_ref: str, repo_id: int | None = None) -> dict:
+                      source_type: str, source_ref: str, repo_id: int | None = None,
+                      provenance_url: str = "", provenance_summary: str = "",
+                      applicable_paths: str = "") -> dict:
     db = await get_db()
     try:
         cursor = await db.execute(
-            """INSERT INTO knowledge_rules (rule_text, category, confidence, source_type, source_ref, repo_id)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (rule_text, category, confidence, source_type, source_ref, repo_id),
+            """INSERT INTO knowledge_rules
+               (rule_text, category, confidence, source_type, source_ref, repo_id,
+                provenance_url, provenance_summary, applicable_paths)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (rule_text, category, confidence, source_type, source_ref, repo_id,
+             provenance_url, provenance_summary, applicable_paths),
         )
         await db.commit()
         row = await (await db.execute("SELECT * FROM knowledge_rules WHERE id = ?", (cursor.lastrowid,))).fetchone()
@@ -463,6 +496,47 @@ async def update_proposal_repo_id(proposal_id: int, repo_id: int) -> None:
         await db.close()
 
 
+# --------------- Mined Sessions ---------------
+
+async def upsert_mined_session(path: str, project_path: str, message_count: int, rules_found: int) -> dict:
+    db = await get_db()
+    try:
+        await db.execute(
+            """INSERT INTO mined_sessions (path, project_path, message_count, rules_found, last_mined_at)
+               VALUES (?, ?, ?, ?, datetime('now'))
+               ON CONFLICT(path) DO UPDATE SET
+                 message_count = excluded.message_count,
+                 rules_found = excluded.rules_found,
+                 last_mined_at = datetime('now')""",
+            (path, project_path, message_count, rules_found),
+        )
+        await db.commit()
+        row = await (await db.execute("SELECT * FROM mined_sessions WHERE path = ?", (path,))).fetchone()
+        return dict(row)
+    finally:
+        await db.close()
+
+
+async def get_mined_session(path: str) -> dict | None:
+    db = await get_db()
+    try:
+        row = await (await db.execute("SELECT * FROM mined_sessions WHERE path = ?", (path,))).fetchone()
+        return dict(row) if row else None
+    finally:
+        await db.close()
+
+
+async def list_mined_sessions() -> list[dict]:
+    db = await get_db()
+    try:
+        rows = await (await db.execute(
+            "SELECT * FROM mined_sessions ORDER BY last_mined_at DESC"
+        )).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+
 async def find_similar_pending_proposals(rule_text: str) -> list[dict]:
     """Return all pending proposals for similarity comparison."""
     db = await get_db()
@@ -471,5 +545,99 @@ async def find_similar_pending_proposals(rule_text: str) -> list[dict]:
             "SELECT * FROM proposals WHERE status = 'pending' ORDER BY created_at DESC"
         )).fetchall()
         return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+
+# --------------- Outcome Metrics ---------------
+
+async def upsert_outcome_metrics(
+    repo_id: int, week_start: str,
+    pr_revision_rounds: float = 0, ci_failure_rate: float = 0,
+    review_comment_density: float = 0, time_to_merge_hours: float = 0,
+    first_timer_time_to_merge_hours: float = 0, rules_deployed: int = 0,
+) -> dict:
+    db = await get_db()
+    try:
+        await db.execute(
+            """INSERT INTO outcome_metrics
+               (repo_id, week_start, pr_revision_rounds, ci_failure_rate,
+                review_comment_density, time_to_merge_hours,
+                first_timer_time_to_merge_hours, rules_deployed)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(repo_id, week_start) DO UPDATE SET
+                 pr_revision_rounds = excluded.pr_revision_rounds,
+                 ci_failure_rate = excluded.ci_failure_rate,
+                 review_comment_density = excluded.review_comment_density,
+                 time_to_merge_hours = excluded.time_to_merge_hours,
+                 first_timer_time_to_merge_hours = excluded.first_timer_time_to_merge_hours,
+                 rules_deployed = excluded.rules_deployed,
+                 measured_at = datetime('now')""",
+            (repo_id, week_start, pr_revision_rounds, ci_failure_rate,
+             review_comment_density, time_to_merge_hours,
+             first_timer_time_to_merge_hours, rules_deployed),
+        )
+        await db.commit()
+        row = await (await db.execute(
+            "SELECT * FROM outcome_metrics WHERE repo_id = ? AND week_start = ?",
+            (repo_id, week_start),
+        )).fetchone()
+        return dict(row)
+    finally:
+        await db.close()
+
+
+async def list_outcome_metrics(repo_id: int, limit: int = 12) -> list[dict]:
+    db = await get_db()
+    try:
+        rows = await (await db.execute(
+            "SELECT * FROM outcome_metrics WHERE repo_id = ? ORDER BY week_start DESC LIMIT ?",
+            (repo_id, limit),
+        )).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+
+async def get_rules_with_provenance(repo_id: int | None = None) -> list[dict]:
+    """Get rules that have provenance information."""
+    db = await get_db()
+    try:
+        query = "SELECT * FROM knowledge_rules WHERE provenance_url != ''"
+        params: list = []
+        if repo_id is not None:
+            query += " AND repo_id = ?"
+            params.append(repo_id)
+        query += " ORDER BY confidence DESC"
+        rows = await (await db.execute(query, params)).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+
+async def update_rule_provenance(rule_id: int, provenance_url: str, provenance_summary: str) -> dict | None:
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE knowledge_rules SET provenance_url = ?, provenance_summary = ? WHERE id = ?",
+            (provenance_url, provenance_summary, rule_id),
+        )
+        await db.commit()
+        row = await (await db.execute("SELECT * FROM knowledge_rules WHERE id = ?", (rule_id,))).fetchone()
+        return dict(row) if row else None
+    finally:
+        await db.close()
+
+
+async def update_rule_paths(rule_id: int, applicable_paths: str) -> dict | None:
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE knowledge_rules SET applicable_paths = ? WHERE id = ?",
+            (applicable_paths, rule_id),
+        )
+        await db.commit()
+        row = await (await db.execute("SELECT * FROM knowledge_rules WHERE id = ?", (rule_id,))).fetchone()
+        return dict(row) if row else None
     finally:
         await db.close()

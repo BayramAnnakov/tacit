@@ -82,6 +82,32 @@ struct SidebarView: View {
                         .foregroundStyle(.green)
                 }
                 .tag(SidebarItem.extraction)
+
+                Label {
+                    Text("Hooks")
+                } icon: {
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .foregroundStyle(.cyan)
+                }
+                .tag(SidebarItem.hooks)
+            }
+
+            Section("Insights") {
+                Label {
+                    Text("Metrics")
+                } icon: {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .foregroundStyle(.mint)
+                }
+                .tag(SidebarItem.metrics)
+
+                Label {
+                    Text("Health")
+                } icon: {
+                    Image(systemName: "heart.text.square.fill")
+                        .foregroundStyle(.pink)
+                }
+                .tag(SidebarItem.health)
             }
 
             Section("Repositories") {

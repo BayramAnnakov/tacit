@@ -75,4 +75,28 @@ def get_agent_definitions() -> dict[str, AgentDefinition]:
             model="opus",
             tools=["github_fetch_pr_diff", "list_all_knowledge", "search_knowledge"],
         ),
+        "session-analyzer": AgentDefinition(
+            description="Analyzes Claude Code conversation transcripts to extract tacit knowledge from corrections, tool patterns, and implicit preferences",
+            prompt=_load_prompt("session_analyzer.md"),
+            model="sonnet",
+            tools=["store_knowledge", "search_knowledge"],
+        ),
+        "anti-pattern-miner": AgentDefinition(
+            description="Mines CHANGES_REQUESTED PR reviews to extract 'Do Not' rules from recurring reviewer complaints",
+            prompt=_load_prompt("anti_pattern_miner.md"),
+            model="opus",
+            tools=["github_fetch_rejected_patterns", "store_knowledge", "search_knowledge", "list_all_knowledge"],
+        ),
+        "outcome-analyzer": AgentDefinition(
+            description="Collects and analyzes PR/CI outcome metrics to measure CLAUDE.md effectiveness",
+            prompt=_load_prompt("outcome_analyzer.md"),
+            model="sonnet",
+            tools=["github_fetch_outcome_metrics", "list_all_knowledge", "search_knowledge"],
+        ),
+        "modular-generator": AgentDefinition(
+            description="Generates a .claude/rules/ directory structure with path-scoped rule files instead of a monolithic CLAUDE.md",
+            prompt=_load_prompt("modular_generator.md"),
+            model="opus",
+            tools=["list_all_knowledge", "search_knowledge"],
+        ),
     }

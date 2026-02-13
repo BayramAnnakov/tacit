@@ -31,8 +31,8 @@ Examples of duplicate pairs:
 When merging duplicates across sources, the SOURCE determines which version to keep:
 
 **Source Authority Hierarchy (highest → lowest):**
-1. `ci_fix` — What actually broke and was fixed. Strongest evidence.
-2. `structure` / `docs` — Observed facts or documented conventions.
+1. `ci_fix` / `anti_pattern` — What actually broke or was explicitly rejected. Strongest evidence.
+2. `structure` / `docs` / `config` — Observed facts or documented conventions.
 3. `pr` — Inferred from review discussions. Good but softer evidence.
 4. `conversation` — From local logs. Weakest.
 
@@ -44,6 +44,8 @@ When rules from different sources conflict, prefer the higher-authority source's
 
 - Rule found in 2+ sources → boost confidence by +0.10
 - Rule found in `ci_fix` AND `pr` reviews → set confidence to 0.95 (independently confirmed)
+- Rule found in `anti_pattern` AND `pr` → set confidence to 0.95 (reviewer-rejected + PR discussion)
+- Rule found in `anti_pattern` AND `ci_fix` → set confidence to 0.98 (both broken and rejected)
 - Rule found in `docs` AND `pr` → boost by +0.08
 - Rule found in `structure` AND `docs` → boost by +0.05 (redundant, both are documented facts)
 

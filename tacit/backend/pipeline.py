@@ -92,11 +92,11 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
         yield ExtractionEvent(
             event_type="stage_change",
             stage="repo_analysis",
-            message=f"Analyzing repository structure, docs, and CI patterns for {repo}...",
+            message=f"Analyzing repository structure, docs, CI patterns, and anti-patterns for {repo}...",
         )
         await db.update_extraction_run(run_id, stage="repo_analysis")
 
-        # Launch structural, docs, and CI analysis in parallel
+        # Launch structural, docs, CI, code, and anti-pattern analysis in parallel
         structural_task = asyncio.create_task(
             _run_structural_analysis(repo, github_token, repo_id)
         )
@@ -109,12 +109,15 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
         code_analysis_task = asyncio.create_task(
             _run_code_analysis(repo, github_token, repo_id)
         )
+        anti_pattern_task = asyncio.create_task(
+            _run_anti_pattern_mining(repo, github_token, repo_id)
+        )
 
         yield ExtractionEvent(
             event_type="progress",
             stage="repo_analysis",
-            message="Launched parallel analysis: repo structure, docs, CI failures, code analysis",
-            data={"parallel_tasks": ["structural", "docs", "ci_fixes", "code_analysis"]},
+            message="Launched parallel analysis: repo structure, docs, CI failures, code analysis, anti-patterns",
+            data={"parallel_tasks": ["structural", "docs", "ci_fixes", "code_analysis", "anti_patterns"]},
         )
 
         # === Phase 2: PR analysis (sequential, existing flow) ===
@@ -199,12 +202,12 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
         )
 
         parallel_results = await asyncio.gather(
-            structural_task, docs_task, ci_fixes_task, code_analysis_task,
+            structural_task, docs_task, ci_fixes_task, code_analysis_task, anti_pattern_task,
             return_exceptions=True,
         )
 
         # Report parallel task results
-        task_names = ["Structural analysis", "Docs analysis", "CI failure mining", "Code analysis"]
+        task_names = ["Structural analysis", "Docs analysis", "CI failure mining", "Code analysis", "Anti-pattern mining"]
         for name, result in zip(task_names, parallel_results):
             if isinstance(result, Exception):
                 logger.warning(f"{name} failed: {result}")
@@ -345,6 +348,18 @@ async def _run_code_analysis(repo: str, github_token: str, repo_id: int) -> str:
     return await _run_agent("code-analyzer", prompt, repo_id)
 
 
+async def _run_anti_pattern_mining(repo: str, github_token: str, repo_id: int) -> str:
+    """Run the anti-pattern miner agent on CHANGES_REQUESTED PRs."""
+    prompt = (
+        f"Mine anti-patterns from CHANGES_REQUESTED PR reviews in repository '{repo}'. "
+        f"Use github_fetch_rejected_patterns with repo='{repo}', github_token='{github_token}'. "
+        f"Extract 'Do Not' rules from recurring reviewer complaints. "
+        f"Include provenance_url (link to the PR) and provenance_summary (what went wrong) with each rule. "
+        f"Store each rule using store_knowledge with source_type='anti_pattern' and repo_id={repo_id}."
+    )
+    return await _run_agent("anti-pattern-miner", prompt, repo_id)
+
+
 def _parse_pr_numbers(scanner_result: str) -> list[int]:
     """Parse PR numbers from scanner output, with fallback."""
     pr_numbers = []
@@ -455,6 +470,143 @@ async def run_single_pr_extraction(repo: str, pr_number: int, github_token: str)
     return new_proposals
 
 
+async def mine_session(transcript_path: str, cwd: str = "") -> dict:
+    """Mine a single Claude Code session transcript for tacit knowledge.
+
+    Reads the JSONL transcript, extracts user/assistant messages,
+    sends to the session-analyzer agent, and stores extracted rules.
+    Returns session metadata with rules_found count.
+    """
+    from pathlib import Path
+    path = Path(transcript_path)
+    if not path.exists():
+        logger.warning(f"Transcript not found: {transcript_path}")
+        return {"path": transcript_path, "rules_found": 0, "error": "file not found"}
+
+    # Check if already mined
+    existing = await db.get_mined_session(transcript_path)
+    if existing:
+        return {"path": transcript_path, "rules_found": existing["rules_found"], "skipped": True}
+
+    # Read JSONL transcript
+    messages = []
+    try:
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    role = entry.get("role", "")
+                    if role in ("user", "assistant"):
+                        content = entry.get("content", "")
+                        if isinstance(content, list):
+                            # Extract text blocks from content array
+                            text_parts = []
+                            for block in content:
+                                if isinstance(block, dict) and block.get("type") == "text":
+                                    text_parts.append(block.get("text", ""))
+                                elif isinstance(block, str):
+                                    text_parts.append(block)
+                            content = "\n".join(text_parts)
+                        if content:
+                            messages.append({"role": role, "content": str(content)[:1000]})
+                except json.JSONDecodeError:
+                    continue
+    except Exception as e:
+        logger.error(f"Error reading transcript {transcript_path}: {e}")
+        return {"path": transcript_path, "rules_found": 0, "error": str(e)}
+
+    if len(messages) < 4:
+        # Too short to extract meaningful knowledge
+        await db.upsert_mined_session(transcript_path, cwd, len(messages), 0)
+        return {"path": transcript_path, "message_count": len(messages), "rules_found": 0}
+
+    # Build conversation summary for the agent (limit to ~30k chars)
+    conversation_text = []
+    char_budget = 30000
+    for msg in messages:
+        line = f"[{msg['role']}]: {msg['content']}"
+        if sum(len(l) for l in conversation_text) + len(line) > char_budget:
+            break
+        conversation_text.append(line)
+
+    prompt = (
+        f"Analyze this Claude Code conversation transcript and extract tacit knowledge rules.\n"
+        f"Project directory: {cwd or 'unknown'}\n\n"
+        f"CONVERSATION:\n{''.join(chr(10) + l for l in conversation_text)}\n\n"
+        f"Return a JSON array of extracted rules. Each rule needs: rule_text, category, confidence, source_excerpt."
+    )
+
+    try:
+        result = await _run_agent("session-analyzer", prompt)
+
+        # Parse rules from agent output
+        rules_found = 0
+        try:
+            import re
+            match = re.search(r'\[.*\]', result, re.DOTALL)
+            if match:
+                parsed = json.loads(match.group())
+                for rule_data in parsed:
+                    if not isinstance(rule_data, dict) or not rule_data.get("rule_text"):
+                        continue
+                    await db.insert_rule(
+                        rule_text=rule_data["rule_text"],
+                        category=rule_data.get("category", "general"),
+                        confidence=rule_data.get("confidence", 0.7),
+                        source_type="conversation",
+                        source_ref=f"session:{transcript_path}",
+                    )
+                    rules_found += 1
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.warning(f"Could not parse session analyzer output: {e}")
+
+        await db.upsert_mined_session(transcript_path, cwd, len(messages), rules_found)
+        return {"path": transcript_path, "message_count": len(messages), "rules_found": rules_found}
+
+    except Exception as e:
+        logger.error(f"Session analysis failed for {transcript_path}: {e}")
+        await db.upsert_mined_session(transcript_path, cwd, len(messages), 0)
+        return {"path": transcript_path, "message_count": len(messages), "rules_found": 0, "error": str(e)}
+
+
+async def mine_all_sessions() -> list[dict]:
+    """Scan all Claude Code project directories and mine transcripts.
+
+    Scans ~/.claude/projects/ for JSONL transcripts, processes newest first,
+    skips already-mined files.
+    """
+    from pathlib import Path
+    claude_dir = Path.home() / ".claude" / "projects"
+    if not claude_dir.exists():
+        return []
+
+    # Collect all JSONL files with their modification times
+    transcripts = []
+    for proj_dir in claude_dir.iterdir():
+        if not proj_dir.is_dir():
+            continue
+        project_path = proj_dir.name  # encoded project path
+        for jsonl_file in proj_dir.glob("*.jsonl"):
+            transcripts.append({
+                "path": str(jsonl_file),
+                "project_path": project_path,
+                "mtime": jsonl_file.stat().st_mtime,
+            })
+
+    # Sort newest first
+    transcripts.sort(key=lambda t: t["mtime"], reverse=True)
+
+    results = []
+    for t in transcripts:
+        result = await mine_session(t["path"], t["project_path"])
+        results.append(result)
+
+    return results
+
+
 async def generate_claude_md(repo_id: int) -> str:
     """Generate CLAUDE.md content from the knowledge base for a given repo."""
     # First try generating via the AI agent
@@ -527,3 +679,218 @@ async def generate_claude_md(repo_id: int) -> str:
             lines.append(f"- {r['rule_text']}")
 
     return "\n".join(lines) + "\n"
+
+
+async def incremental_extract(repo: str, pr_number: int, github_token: str) -> dict:
+    """Extract knowledge from a single merged PR incrementally.
+
+    Unlike run_single_pr_extraction, this:
+    1. Also runs anti-pattern mining on the specific PR
+    2. Performs lightweight dedup synthesis (not full re-synthesis)
+    3. Auto-approves high-confidence rules (>= 0.85)
+    4. Creates proposals for lower-confidence rules
+    Returns summary of actions taken.
+    """
+    repos = await db.list_repos()
+    repo_record = None
+    for r in repos:
+        if r["full_name"] == repo:
+            repo_record = r
+            break
+
+    if not repo_record:
+        logger.warning(f"Repo {repo} not found for incremental extraction")
+        return {"new_rules": 0, "new_proposals": 0, "error": "repo not found"}
+
+    repo_id = repo_record["id"]
+
+    # Get existing rule IDs before extraction
+    existing_rules = await db.list_rules(repo_id=repo_id)
+    existing_ids = {r["id"] for r in existing_rules}
+
+    # Run thread analyzer on this specific PR
+    analyzer_prompt = (
+        f"Analyze PR #{pr_number} in repository '{repo}'. "
+        f"Use github_fetch_comments with repo='{repo}', pr_number={pr_number}, github_token='{github_token}'. "
+        f"Extract knowledge rules and store them using store_knowledge with repo_id={repo_id}. "
+        f"Include provenance_url='https://github.com/{repo}/pull/{pr_number}' and "
+        f"provenance_summary describing the context from the PR discussion. "
+        f"Also include applicable_paths if the rule is specific to certain directories."
+    )
+    await _run_agent("thread-analyzer", analyzer_prompt, repo_id)
+
+    # Get new rules
+    all_rules = await db.list_rules(repo_id=repo_id)
+    new_rules = [r for r in all_rules if r["id"] not in existing_ids]
+
+    # Lightweight dedup: check each new rule against existing rules
+    auto_approved = 0
+    proposals_created = 0
+
+    for new_rule in new_rules:
+        # Check for duplicates via text similarity
+        is_dup = False
+        for existing in existing_rules:
+            from difflib import SequenceMatcher
+            sim = SequenceMatcher(None, new_rule["rule_text"].lower(), existing["rule_text"].lower()).ratio()
+            if sim > 0.7:
+                # Duplicate — delete the new one, optionally boost existing
+                await db.delete_rule(new_rule["id"])
+                is_dup = True
+                break
+
+        if is_dup:
+            continue
+
+        # Auto-approve high-confidence rules, create proposals for others
+        if new_rule["confidence"] >= 0.85:
+            auto_approved += 1
+            await db.add_trail_entry(
+                rule_id=new_rule["id"],
+                event_type="auto_approved",
+                description=f"Auto-approved from incremental extraction of PR #{pr_number} (confidence {new_rule['confidence']:.2f})",
+                source_ref=f"pr:{repo}#{pr_number}",
+            )
+        else:
+            await db.create_proposal(
+                rule_text=new_rule["rule_text"],
+                category=new_rule["category"],
+                confidence=new_rule["confidence"],
+                source_excerpt=f"Incrementally extracted from merged PR #{pr_number}",
+                proposed_by="webhook",
+            )
+            # Remove from rules (it's a proposal now, not approved yet)
+            await db.delete_rule(new_rule["id"])
+            proposals_created += 1
+
+    logger.info(
+        f"Incremental extraction for PR #{pr_number}: "
+        f"{auto_approved} auto-approved, {proposals_created} proposals"
+    )
+    return {
+        "pr_number": pr_number,
+        "new_rules": auto_approved,
+        "new_proposals": proposals_created,
+        "total_extracted": len(new_rules),
+    }
+
+
+async def collect_outcome_metrics(repo: str, github_token: str, repo_id: int, days: int = 14) -> dict:
+    """Collect outcome metrics for a repository via the outcome-analyzer agent."""
+    prompt = (
+        f"Collect outcome metrics for repository '{repo}'. "
+        f"Use github_fetch_outcome_metrics with repo='{repo}', github_token='{github_token}', days={days}. "
+        f"Then use list_all_knowledge with repo_id={repo_id} to count deployed rules. "
+        f"Return a JSON object with the metrics."
+    )
+
+    result = await _run_agent("outcome-analyzer", prompt, repo_id)
+
+    # Parse metrics from agent output
+    try:
+        import re
+        match = re.search(r'\{.*\}', result, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.warning(f"Could not parse outcome metrics: {e}")
+
+    return {}
+
+
+async def generate_modular_rules(repo_id: int) -> dict:
+    """Generate a .claude/rules/ directory structure from the knowledge base.
+
+    Returns a dict mapping file paths to content strings.
+    """
+    # First try via AI agent
+    try:
+        prompt = (
+            f"Generate a modular .claude/rules/ directory structure from all knowledge rules with repo_id={repo_id}. "
+            f"Use list_all_knowledge to retrieve rules, then organize them into path-scoped rule files. "
+            f"Rules with applicable_paths should get YAML frontmatter with paths: field. "
+            f"Anti-pattern/Do Not rules go in do-not.md (always loaded). "
+            f"Return a JSON object mapping file paths to content strings."
+        )
+        result = await _run_agent("modular-generator", prompt, repo_id)
+
+        import re
+        match = re.search(r'\{.*\}', result, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+    except Exception as e:
+        logger.warning(f"Agent-based modular generation failed: {e}")
+
+    # Fallback: build directly from rules
+    return await _build_modular_rules_fallback(repo_id)
+
+
+async def _build_modular_rules_fallback(repo_id: int) -> dict:
+    """Build modular rules directly from DB when agent fails."""
+    rules = await db.list_rules(repo_id=repo_id)
+    if not rules:
+        return {".claude/CLAUDE.md": "# CLAUDE.md\n\nNo rules extracted yet.\n"}
+
+    # Categorize rules
+    files: dict[str, list[str]] = {}
+    do_not_rules: list[str] = []
+
+    category_to_file = {
+        "workflow": ".claude/rules/workflow.md",
+        "style": ".claude/rules/code-style.md",
+        "testing": ".claude/rules/testing.md",
+        "architecture": ".claude/rules/architecture.md",
+        "security": ".claude/rules/security.md",
+        "performance": ".claude/rules/performance.md",
+        "general": ".claude/rules/general.md",
+    }
+
+    for rule in rules:
+        if rule["confidence"] < 0.6:
+            continue
+
+        text = rule["rule_text"]
+        paths = rule.get("applicable_paths", "")
+
+        # Check if it's a "Do Not" rule
+        if any(kw in text.upper() for kw in ["NEVER", "DO NOT", "DON'T", "MUST NOT", "FORBIDDEN", "AVOID"]):
+            provenance = ""
+            if rule.get("provenance_summary"):
+                provenance = f" ({rule['provenance_summary'][:100]})"
+            do_not_rules.append(f"- {text}{provenance}")
+            continue
+
+        # Path-scoped rules go to subdirectory files
+        if paths:
+            path_parts = paths.split(",")[0].strip().split("/")
+            if len(path_parts) >= 2:
+                subdir = path_parts[0] if path_parts[0] not in ("src", "lib") else path_parts[1]
+                file_key = f".claude/rules/{subdir}/{rule['category']}.md"
+            else:
+                file_key = category_to_file.get(rule["category"], ".claude/rules/general.md")
+        else:
+            file_key = category_to_file.get(rule["category"], ".claude/rules/general.md")
+
+        files.setdefault(file_key, []).append(f"- {text}")
+
+    result: dict[str, str] = {}
+
+    # Core CLAUDE.md
+    result[".claude/CLAUDE.md"] = "# CLAUDE.md\n\nSee `.claude/rules/` for detailed conventions.\n"
+
+    # Do Not file (always loaded)
+    if do_not_rules:
+        result[".claude/rules/do-not.md"] = (
+            "---\ndescription: Critical anti-patterns — things that WILL cause problems if ignored\n---\n\n"
+            + "\n".join(do_not_rules) + "\n"
+        )
+
+    # Category files
+    for file_path, rule_lines in sorted(files.items()):
+        category = file_path.split("/")[-1].replace(".md", "").replace("-", " ").title()
+        # Check if any rules in this file have path scoping
+        content = f"---\ndescription: {category} conventions\n---\n\n"
+        content += "\n".join(rule_lines) + "\n"
+        result[file_path] = content
+
+    return result
