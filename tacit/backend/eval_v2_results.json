@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-02-15T07:02:32.781198+00:00",
+  "timestamp": "2026-02-15T19:02:03.508920+00:00",
   "repos": [
     "langchain-ai/langchain",
     "denoland/deno",
@@ -10,7 +10,7 @@
     "anthropics/claude-agent-sdk-python",
     "openclaw/openclaw"
   ],
-  "overall_score": 0.8159,
+  "overall_score": 0.833,
   "evals": [
     {
       "name": "Anti-Pattern Mining",
@@ -18,8 +18,8 @@
       "details": {
         "repos_with_patterns": 7,
         "total_repos": 8,
-        "avg_patterns_per_repo": 4.5,
-        "total_patterns": 36,
+        "avg_patterns_per_repo": 4.1,
+        "total_patterns": 33,
         "per_repo": {
           "langchain-ai/langchain": {
             "patterns_found": 1,
@@ -68,80 +68,82 @@
             ]
           },
           "denoland/deno": {
-            "patterns_found": 4,
-            "valid_patterns": 4,
+            "patterns_found": 6,
+            "valid_patterns": 6,
             "sample": [
               {
-                "pr_number": 31867,
-                "pr_title": "feat(ext/tls): add `SSLKEYLOGFILE` support for TLS key logging",
-                "author": "magurotuna",
+                "pr_number": 32152,
+                "pr_title": "fix(ext/node): support O_RDONLY | O_CREAT in fs.openSync",
+                "author": "shtse8",
                 "merged": true,
-                "has_formal_rejection": false,
+                "has_formal_rejection": true,
                 "review_bodies": [
                   {
-                    "author": "bartlomieju",
-                    "state": "COMMENTED",
-                    "body": "LGTM, can you update `static ENV_VARS: &[EnvVar]` in `cli/args/flags.rs`?"
+                    "author": "Tango992",
+                    "state": "CHANGES_REQUESTED",
+                    "body": "Thanks! Just a minor review"
+                  },
+                  {
+                    "author": "Tango992",
+                    "state": "APPROVED",
+                    "body": "LGTM"
                   }
                 ],
                 "inline_review_comments": [
                   {
-                    "author": "bartlomieju",
-                    "body": "This env var should be resolved on startup, otherwise someone might use `Deno.env.set(...)` before starting a TLS connection to capture the key",
-                    "path": "ext/tls/keylog.rs",
-                    "diff_hunk": "@@ -0,0 +1,32 @@\n+// Copyright 2018-2026 the Deno authors. MIT license.\n+\n+//! TLS key logging support for debugging encrypted traffic.\n+//!\n+//! When the `SSLKEYLOGFILE` environment variable is set, TLS session keys\n+//! are written to the specified file in NSS Key Log format, which can be\n+//! used by tools like Wireshark to decrypt TLS traffic.\n+\n+use std::env;\n+use std::fs::OpenOptions;\n+use s",
+                    "author": "Tango992",
+                    "body": "```suggestion\n        read: true,\n        write: false,\n        create: false,\n        truncate: opts.truncate,\n        append: false,\n        create_new: false,\n        custom_flags: opts.custom_flags,\n        mode: opts.mode,\n```\n\nShould it be like this? ",
+                    "path": "ext/fs/std_fs.rs",
+                    "diff_hunk": "@@ -1029,13 +1029,49 @@ fn open_options(options: OpenOptions) -> fs::OpenOptions {\n   open_options\n }\n \n-#[inline(always)]\n pub fn open_with_checked_path(\n-  options: OpenOptions,\n+  opts: OpenOptions,\n   path: &CheckedPath,\n ) -> FsResult<std::fs::File> {\n-  let opts = open_options_for_checked_path(options, path);\n-  Ok(opts.open(path)?)\n+  // Rust's std::fs::OpenOptions requires write or append ",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "shtse8",
+                    "body": "Thanks for the review!\n\nThe current values are intentional:\n\n- `truncate: false` \u2014 Truncating a read-only fd doesn't make sense (and POSIX defines `O_RDONLY | O_TRUNC` as undefined behavior). The truncate flag is already handled in the creation step if it were combined with write.\n- `mode: None` \u2014 The file permission mode is already applied during the creation step above (line 1048). When re-opening for read-only, mode has no effect so we skip it.\n\nThe `custom_flags` and other options that do af",
+                    "path": "ext/fs/std_fs.rs",
+                    "diff_hunk": "@@ -1029,13 +1029,49 @@ fn open_options(options: OpenOptions) -> fs::OpenOptions {\n   open_options\n }\n \n-#[inline(always)]\n pub fn open_with_checked_path(\n-  options: OpenOptions,\n+  opts: OpenOptions,\n   path: &CheckedPath,\n ) -> FsResult<std::fs::File> {\n-  let opts = open_options_for_checked_path(options, path);\n-  Ok(opts.open(path)?)\n+  // Rust's std::fs::OpenOptions requires write or append ",
                     "has_suggestion_block": false
                   },
                   {
-                    "author": "magurotuna",
-                    "body": "that makes total sense! fixed it [c26dc48](https://github.com/denoland/deno/pull/31867/commits/c26dc48e3c001ee19b83241bd5e7cb336a45c1ac) and added test [fafd2c4](https://github.com/denoland/deno/pull/31867/commits/fafd2c44044954aea47087ca8f80565ba2f40fa7)",
-                    "path": "ext/tls/keylog.rs",
-                    "diff_hunk": "@@ -0,0 +1,32 @@\n+// Copyright 2018-2026 the Deno authors. MIT license.\n+\n+//! TLS key logging support for debugging encrypted traffic.\n+//!\n+//! When the `SSLKEYLOGFILE` environment variable is set, TLS session keys\n+//! are written to the specified file in NSS Key Log format, which can be\n+//! used by tools like Wireshark to decrypt TLS traffic.\n+\n+use std::env;\n+use std::fs::OpenOptions;\n+use s",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "bartlomieju",
-                    "body": "Maybe just for extra safety, let's assert the last path is `keylog.txt` (and not `late_keylog.txt`)",
-                    "path": "tests/specs/run/sslkeylogfile/__test__.jsonc",
-                    "diff_hunk": "@@ -0,0 +1,28 @@\n+{\n+  \"tempDir\": true,\n+  \"tests\": {\n+    \"writes_keylog\": {\n+      \"envs\": { \"SSLKEYLOGFILE\": \"./keylog.txt\" },\n+      \"steps\": [\n+        {\n+          \"args\": \"run --allow-net --allow-env main.ts\",\n+          \"output\": \"[WILDCARD]200[WILDCARD]\"\n+        },\n+        {\n+          \"commandName\": \"cat\",\n+          \"args\": \"keylog.txt\",\n+          \"output\": \"[WILDCARD]CLIENT_HANDSHAK",
-                    "has_suggestion_block": false
-                  }
-                ],
-                "total_review_comments": 3,
-                "review_rounds": 5
-              },
-              {
-                "pr_number": 32137,
-                "pr_title": "tests(node/ext): ignore zlib kmaxlength tests",
-                "author": "fraidev",
-                "merged": true,
-                "has_formal_rejection": false,
-                "review_bodies": [],
-                "inline_review_comments": [
-                  {
-                    "author": "fraidev",
-                    "body": "not sure we want changes here, but this was the hacky solution for that",
-                    "path": "ext/node/polyfills/01_require.js",
-                    "diff_hunk": "@@ -1266,6 +1266,12 @@ function loadNativeModule(_id, request) {\n   }\n   const modExports = nativeModuleExports[request];\n   if (modExports) {\n+    // Match Node.js CJS semantics: when zlib is first require()'d, capture\n+    // buffer.kMaxLength at that point (Node.js does this via\n+    // `const { kMaxLength } = require('buffer')` at module evaluation time).\n+    if (request === \"zlib\") {",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "bartlomieju",
-                    "body": "I think we should mark these errors as ignored and not bother with increased complexity.",
-                    "path": "tests/node_compat/config.jsonc",
-                    "diff_hunk": "",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "fraidev",
-                    "body": "Makes sense, I revert it and ignore them.",
-                    "path": "tests/node_compat/config.jsonc",
-                    "diff_hunk": "",
+                    "author": "Tango992",
+                    "body": "Ah right",
+                    "path": "ext/fs/std_fs.rs",
+                    "diff_hunk": "@@ -1029,13 +1029,49 @@ fn open_options(options: OpenOptions) -> fs::OpenOptions {\n   open_options\n }\n \n-#[inline(always)]\n pub fn open_with_checked_path(\n-  options: OpenOptions,\n+  opts: OpenOptions,\n   path: &CheckedPath,\n ) -> FsResult<std::fs::File> {\n-  let opts = open_options_for_checked_path(options, path);\n-  Ok(opts.open(path)?)\n+  // Rust's std::fs::OpenOptions requires write or append ",
                     "has_suggestion_block": false
                   }
                 ],
                 "total_review_comments": 3,
                 "review_rounds": 4
+              },
+              {
+                "pr_number": 32178,
+                "pr_title": "fix(ext/node): add parentPath to Dirent from fs.opendir and support Buffer paths in lstat",
+                "author": "bartlomieju",
+                "merged": true,
+                "has_formal_rejection": true,
+                "review_bodies": [
+                  {
+                    "author": "Tango992",
+                    "state": "CHANGES_REQUESTED",
+                    "body": "LGTM, just a minor review"
+                  },
+                  {
+                    "author": "Tango992",
+                    "state": "APPROVED",
+                    "body": "LGTM"
+                  }
+                ],
+                "inline_review_comments": [
+                  {
+                    "author": "Tango992",
+                    "body": "We should use `getValidatedPathToString` from `ext:deno_node/internal/fs/utils.mjs` instead. It will handle invalid path types by giving the same error as node",
+                    "path": "ext/node/polyfills/_fs/_fs_lstat.ts",
+                    "diff_hunk": "@@ -11,13 +11,20 @@ import {\n } from \"ext:deno_node/_fs/_fs_stat.ts\";\n import { promisify } from \"ext:deno_node/internal/util.mjs\";\n import { primordials } from \"ext:core/mod.js\";\n+import { Buffer } from \"ext:deno_node/internal/buffer.mjs\";\n \n const {\n   Error,\n   PromisePrototypeThen,\n   ObjectPrototypeIsPrototypeOf,\n } = primordials;\n \n+function toPathString(path: string | URL | Buffer): string ",
+                    "has_suggestion_block": false
+                  }
+                ],
+                "total_review_comments": 1,
+                "review_rounds": 2
               }
             ]
           },
@@ -756,99 +758,85 @@
             ]
           },
           "openclaw/openclaw": {
-            "patterns_found": 9,
-            "valid_patterns": 9,
+            "patterns_found": 4,
+            "valid_patterns": 4,
             "sample": [
               {
-                "pr_number": 10400,
-                "pr_title": "Discord: add gateway proxy support",
-                "author": "winter-loo",
-                "merged": true,
-                "has_formal_rejection": false,
-                "review_bodies": [
-                  {
-                    "author": "greptile-apps[bot]",
-                    "state": "COMMENTED",
-                    "body": "<sub>1 file reviewed, 2 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  }
-                ],
-                "inline_review_comments": [
-                  {
-                    "author": "greptile-apps[bot]",
-                    "body": "**Missing direct `ws` dependency**\n\n`provider.ts` now does `import WebSocket from \"ws\"`, but `ws` isn\u2019t a direct dependency of this repo (it\u2019s only an *optional* dependency of `@buape/carbon`). In installs/builds where Carbon\u2019s optional deps aren\u2019t present, starting Discord will crash with `ERR_MODULE_NOT_FOUND: Cannot find package 'ws'`. Either avoid importing `ws` directly here or ensure `ws` is a guaranteed runtime dependency.\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\n",
-                    "path": "src/discord/monitor/provider.ts",
-                    "diff_hunk": "@@ -1,9 +1,12 @@\n import { Client } from \"@buape/carbon\";\n import { GatewayIntents, GatewayPlugin } from \"@buape/carbon/gateway\";\n import { Routes } from \"discord-api-types/v10\";\n+import { HttpsProxyAgent } from \"https-proxy-agent\";\n import { inspect } from \"node:util\";\n+import WebSocket from \"ws\";",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "body": "**Proxy scheme mismatch**\n\nConfig/help text allows `channels.discord.proxy` like `http://127.0.0.1:5780`, but the implementation always uses `new HttpsProxyAgent(proxy)`. That agent is intended for HTTPS proxies; a valid `http://\u2026` proxy URL can pass config and then fail at connection time (or behave incorrectly). The agent type should match the proxy URL\u2019s scheme (HTTP vs HTTPS) if both are supported.\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\nThis is a comment left durin",
-                    "path": "src/discord/monitor/provider.ts",
-                    "diff_hunk": "@@ -52,6 +55,51 @@ export type MonitorDiscordOpts = {\n   replyToMode?: ReplyToMode;\n };\n \n+function createDiscordGatewayPlugin(params: {\n+  discordConfig: DiscordAccountConfig;\n+  runtime: RuntimeEnv;\n+}): GatewayPlugin {\n+  const intents = resolveDiscordGatewayIntents(params.discordConfig?.intents);\n+  const proxy = params.discordConfig?.proxy?.trim();\n+  const options = {\n+    reconnect: { maxAt",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "winter-loo",
-                    "body": "`ws` is a dependency already.",
-                    "path": "src/discord/monitor/provider.ts",
-                    "diff_hunk": "@@ -1,9 +1,12 @@\n import { Client } from \"@buape/carbon\";\n import { GatewayIntents, GatewayPlugin } from \"@buape/carbon/gateway\";\n import { Routes } from \"discord-api-types/v10\";\n+import { HttpsProxyAgent } from \"https-proxy-agent\";\n import { inspect } from \"node:util\";\n+import WebSocket from \"ws\";",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "winter-loo",
-                    "body": "Just a name issue. It actually works with 'http' and 'socks5h' in my test.",
-                    "path": "src/discord/monitor/provider.ts",
-                    "diff_hunk": "@@ -52,6 +55,51 @@ export type MonitorDiscordOpts = {\n   replyToMode?: ReplyToMode;\n };\n \n+function createDiscordGatewayPlugin(params: {\n+  discordConfig: DiscordAccountConfig;\n+  runtime: RuntimeEnv;\n+}): GatewayPlugin {\n+  const intents = resolveDiscordGatewayIntents(params.discordConfig?.intents);\n+  const proxy = params.discordConfig?.proxy?.trim();\n+  const options = {\n+    reconnect: { maxAt",
-                    "has_suggestion_block": false
-                  }
-                ],
-                "total_review_comments": 4,
-                "review_rounds": 3
-              },
-              {
-                "pr_number": 11252,
-                "pr_title": "fix: fallback to install.sh script when update fails",
-                "author": "joeykrug",
+                "pr_number": 16869,
+                "pr_title": "feat(discord): Add rich embed support with templates",
+                "author": "cysesaas",
                 "merged": false,
                 "has_formal_rejection": false,
                 "review_bodies": [
                   {
                     "author": "greptile-apps[bot]",
                     "state": "COMMENTED",
-                    "body": "<sub>2 files reviewed, 4 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                    "body": "<sub>6 files reviewed, 3 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
                   }
                 ],
                 "inline_review_comments": [
                   {
                     "author": "greptile-apps[bot]",
-                    "body": "**Fallback can loop/crash**\n\nIn the fallback path you call `runInstallScriptUpdate(...)` without handling exceptions. If the install-script updater throws (e.g., `bash`/`curl` missing), this handler will throw out of the request instead of returning an `UpdateRunResult`. Consider wrapping this call in its own try/catch and returning an error result (or reusing the existing outer fallback path).\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\nThis is a comment left during a code",
-                    "path": "src/gateway/server-methods/update.ts",
-                    "diff_hunk": "@@ -47,31 +48,66 @@ export const updateHandlers: GatewayRequestHandlers = {\n       typeof timeoutMsRaw === \"number\" && Number.isFinite(timeoutMsRaw)\n         ? Math.max(1000, Math.floor(timeoutMsRaw))\n         : undefined;\n+    // New parameter: use install script method\n+    const useInstallScript =\n+      (params as { useInstallScript?: unknown }).useInstallScript === true;\n \n-    let result: Aw",
-                    "has_suggestion_block": false
+                    "body": "**Action field silently dropped when `details` is omitted**\n\nWhen `details` is not provided, `fields` is `undefined` (from the optional chain `params.details?.map(...)`). The subsequent `fields?.push(...)` on line 95 is a no-op on `undefined`, so the action field is silently lost. This means `createAlertEmbed({ title: \"...\", message: \"...\", action: \"Do something\" })` produces an embed with no fields at all.\n\nInitialize `fields` to an empty array as fallback:\n\n```suggestion\n  const fields = param",
+                    "path": "src/discord/embed-templates.ts",
+                    "diff_hunk": "@@ -0,0 +1,318 @@\n+/**\n+ * Discord Embed Templates\n+ * \n+ * Beautiful, ready-to-use embed templates for common use cases.\n+ * All templates follow Discord's embed limits and best practices.\n+ * \n+ * @see https://discord.com/developers/docs/resources/channel#embed-object\n+ */\n+\n+export type DiscordEmbedColor = number;\n+\n+/** Discord brand color (Blurple) */\n+export const DISCORD_BLURPLE: DiscordEmb",
+                    "has_suggestion_block": true
                   },
                   {
                     "author": "greptile-apps[bot]",
-                    "body": "**Wrong error reported**\n\nIn the nested fallback, the inner `catch { ... }` discards the actual error from `runInstallScriptUpdate` and then reports `String(err)` from the *outer* catch. If the complex update throws and the install-script fallback also throws, the user will see the wrong failure reason. Bind the inner error (e.g., `catch (fallbackErr)`) and use that for `reason`.\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\nThis is a comment left during a code review.\nPath: ",
-                    "path": "src/gateway/server-methods/update.ts",
-                    "diff_hunk": "@@ -47,31 +48,66 @@ export const updateHandlers: GatewayRequestHandlers = {\n       typeof timeoutMsRaw === \"number\" && Number.isFinite(timeoutMsRaw)\n         ? Math.max(1000, Math.floor(timeoutMsRaw))\n         : undefined;\n+    // New parameter: use install script method\n+    const useInstallScript =\n+      (params as { useInstallScript?: unknown }).useInstallScript === true;\n \n-    let result: Aw",
-                    "has_suggestion_block": false
+                    "body": "**Test asserts non-existent `label` property instead of `name`**\n\n`createSessionWarningEmbed` delegates to `createAlertEmbed`, which maps `{ label, value }` details into `{ name, value, inline }` fields. The returned embed fields have a `name` property, not `label`. This assertion accesses `f.label` which is always `undefined`, so `f.label === \"Size\"` is always `false`, and `expect(false).toBeTruthy()` should fail.\n\n```suggestion\n      expect(embed.fields?.some((f) => f.name === \"Size\")).toBeTru",
+                    "path": "src/discord/embed-templates.test.ts",
+                    "diff_hunk": "@@ -0,0 +1,303 @@\n+import { describe, expect, it } from \"vitest\";\n+import {\n+  createAlertEmbed,\n+  createCronStatusEmbed,\n+  createErrorEmbed,\n+  createInfoEmbed,\n+  createMemoryStatusEmbed,\n+  createSessionWarningEmbed,\n+  createStatusEmbed,\n+  createSuccessEmbed,\n+  createSystemStatusEmbed,\n+  EmbedColors,\n+  DISCORD_BLURPLE,\n+} from \"./embed-templates.js\";\n+\n+describe(\"Discord Embed Templates\"",
+                    "has_suggestion_block": true
                   },
                   {
                     "author": "greptile-apps[bot]",
-                    "body": "**Windows/container runtime break**\n\n`runInstallScriptUpdate` always executes `bash -c ...` and assumes both `bash` and `curl` exist. On Windows (no bash by default) and minimal Linux images (e.g., Alpine without bash/curl), `runCommandWithTimeout` will throw, which then breaks the update handler unless caught. If this fallback is meant to improve reliability, it needs a preflight check (or a clearer error result) for missing executables/platform support.\n\n<details><summary>Prompt To Fix With AI",
-                    "path": "src/infra/update-install-script.ts",
-                    "diff_hunk": "@@ -0,0 +1,133 @@\n+/**\n+ * Fallback update method using the official install script.\n+ * This is more reliable than the complex git/npm update logic.\n+ */\n+\n+import os from \"node:os\";\n+import path from \"node:path\";\n+import fs from \"node:fs/promises\";\n+import { runCommandWithTimeout, type CommandOptions } from \"../process/exec.js\";\n+import { trimLogTail } from \"./restart-sentinel.js\";\n+import type ",
-                    "has_suggestion_block": false
+                    "body": "**Docs link uses relative path with `.md` extension**\n\nPer repository Mintlify conventions, internal doc links should be root-relative without `.md` extensions. The current relative path `../docs/channels/discord.md` is also incorrect since this file is already inside `docs/`.\n\n```suggestion\n- [OpenClaw Discord Channel Docs](/channels/discord)\n```\n\n**Context Used:** Context from `dashboard` - CLAUDE.md ([source](https://app.greptile.com/review/custom-context?memory=fd949e91-5c3a-4ab5-90a1-cbe184",
+                    "path": "docs/discord-embeds.md",
+                    "diff_hunk": "@@ -0,0 +1,380 @@\n+# Discord Embeds - Usage Guide\n+\n+Discord embeds allow you to send rich, structured messages with colors, fields, and formatting.\n+\n+## Quick Start\n+\n+### Basic Example\n+\n+```typescript\n+import { sendMessageDiscord } from './discord/send.js';\n+import { createStatusEmbed, EmbedColors } from './discord/embed-templates.js';\n+\n+// Create a simple status embed\n+const embed = createSt",
+                    "has_suggestion_block": true
+                  }
+                ],
+                "total_review_comments": 3,
+                "review_rounds": 1
+              },
+              {
+                "pr_number": 17310,
+                "pr_title": "feat: add AI PR triage GitHub Action for duplicate detection",
+                "author": "olivier-motium",
+                "merged": false,
+                "has_formal_rejection": false,
+                "review_bodies": [
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>3 files reviewed, 3 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  }
+                ],
+                "inline_review_comments": [
+                  {
+                    "author": "greptile-apps[bot]",
+                    "body": "**`...opts` spread overrides merged headers**\n\nThe `...opts` spread at line 17 replaces the entire `headers` object constructed on lines 12\u201316 whenever `opts` includes a `headers` key. This means callers that pass both `headers` and other options (like `method` or `body`) \u2014 which `ensureLabel` and `applyLabels` both do \u2014 will lose the `Authorization`, `Accept`, and `X-GitHub-Api-Version` headers. Every label-creation and label-application call will fail with a 401 or 403.\n\nTo fix this, destructu",
+                    "path": "scripts/pr-triage-github.mjs",
+                    "diff_hunk": "@@ -0,0 +1,135 @@\n+/**\n+ * GitHub API helpers for PR triage.\n+ * Handles data fetching, pagination, and PR summary generation.\n+ */\n+\n+const GITHUB_API = \"https://api.github.com\";\n+\n+export function createGitHubClient(token) {\n+  async function gh(path, opts = {}) {\n+    const url = path.startsWith(\"http\") ? path : `${GITHUB_API}${path}`;\n+    const res = await fetch(url, {\n+      headers: {\n+    ",
+                    "has_suggestion_block": true
                   },
                   {
                     "author": "greptile-apps[bot]",
-                    "body": "**Channel type cast bypasses validation**\n\n`channel: configChannel as \"stable\" | \"beta\" | \"dev\" | undefined` bypasses the runtime validation that `normalizeUpdateChannel` provides (and also ignores its `null` possibility). If `normalizeUpdateChannel` ever returns an unexpected value (or its return type changes), this will flow into the install script call without checks. Prefer passing `configChannel ?? undefined` with the correct type, or explicitly narrowing instead of asserting.\n\n<details><su",
-                    "path": "src/gateway/server-methods/update.ts",
-                    "diff_hunk": "@@ -47,31 +48,66 @@ export const updateHandlers: GatewayRequestHandlers = {\n       typeof timeoutMsRaw === \"number\" && Number.isFinite(timeoutMsRaw)\n         ? Math.max(1000, Math.floor(timeoutMsRaw))\n         : undefined;\n+    // New parameter: use install script method\n+    const useInstallScript =\n+      (params as { useInstallScript?: unknown }).useInstallScript === true;\n \n-    let result: Aw",
+                    "body": "**`workflow_dispatch` default \"0\" always errors out**\n\nThe workflow input description says `\"Triage a specific PR number (0 = latest)\"`, but the code treats `0` as an error and exits. When a maintainer triggers the workflow manually without providing a PR number, it will always fail because `PR_NUMBER` defaults to `\"0\"` \u2192 `Number(\"0\")` \u2192 `0` \u2192 `!0` is `true` \u2192 `process.exit(1)`.\n\nEither implement logic to fetch the latest open PR when `prNumber` is 0, or change the workflow default and error mes",
+                    "path": "scripts/pr-triage.mjs",
+                    "diff_hunk": "@@ -0,0 +1,393 @@\n+#!/usr/bin/env node\n+/**\n+ * PR Triage \u2014 AI-powered duplicate detection and categorization.\n+ *\n+ * Single Claude call per PR with cached context of all open PRs\n+ * and recent merge/close decisions. Outputs silent labels only \u2014 no\n+ * public bot comments (political risk: matplotlib/crabby-rathbun Feb 2026).\n+ *\n+ * Default model: Claude Opus 4.6 (1M context). Override with TRIA",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "body": "**Sequential API calls for up to 500 PRs will be very slow**\n\n`getOpenPRSummaries` makes one additional API call per PR to fetch its files. With the default `MAX_OPEN_PRS=500`, this results in up to 500 sequential HTTP requests. Combined with the paginated fetch of the PR list itself (5 pages of 100), that's ~505 serial requests. At ~200ms per API call, this would take ~100 seconds just for data collection \u2014 and GitHub Actions has rate limits (5000 requests/hour for app tokens) that could be hit",
+                    "path": "scripts/pr-triage-github.mjs",
+                    "diff_hunk": "@@ -0,0 +1,135 @@\n+/**\n+ * GitHub API helpers for PR triage.\n+ * Handles data fetching, pagination, and PR summary generation.\n+ */\n+\n+const GITHUB_API = \"https://api.github.com\";\n+\n+export function createGitHubClient(token) {\n+  async function gh(path, opts = {}) {\n+    const url = path.startsWith(\"http\") ? path : `${GITHUB_API}${path}`;\n+    const res = await fetch(url, {\n+      headers: {\n+    ",
                     "has_suggestion_block": false
                   }
                 ],
-                "total_review_comments": 4,
+                "total_review_comments": 3,
                 "review_rounds": 1
               }
             ]
@@ -856,17 +844,17 @@
         }
       },
       "error": null,
-      "duration_seconds": 148.71
+      "duration_seconds": 157.37
     },
     {
       "name": "Provenance Coverage",
-      "score": 0.9909,
+      "score": 0.9852,
       "details": {
-        "total_rules": 991,
-        "rules_with_provenance_url": 973,
-        "rules_with_provenance_summary": 991,
-        "valid_github_urls": 973,
-        "url_coverage_pct": 98.2,
+        "total_rules": 809,
+        "rules_with_provenance_url": 785,
+        "rules_with_provenance_summary": 809,
+        "valid_github_urls": 765,
+        "url_coverage_pct": 97.0,
         "summary_coverage_pct": 100.0
       },
       "error": null,
@@ -874,131 +862,139 @@
     },
     {
       "name": "Path Scoping Coverage",
-      "score": 0.5126,
+      "score": 0.5637,
       "details": {
-        "total_rules": 991,
-        "rules_with_paths": 508,
-        "rules_with_valid_globs": 507,
-        "path_coverage_pct": 51.3
+        "total_rules": 809,
+        "rules_with_paths": 456,
+        "rules_with_valid_globs": 456,
+        "path_coverage_pct": 56.4
       },
       "error": null,
       "duration_seconds": 0.01
     },
     {
       "name": "Modular Rules Generation",
-      "score": 0.996,
+      "score": 0.9625,
       "details": {
-        "total_files_generated": 174,
-        "valid_files": 173,
-        "repos_with_donot": 8,
-        "file_validity_pct": 99.4,
-        "donot_coverage_pct": 100.0,
+        "total_files_generated": 123,
+        "valid_files": 123,
+        "repos_with_donot": 7,
+        "file_validity_pct": 100.0,
+        "donot_coverage_pct": 87.5,
         "per_repo": {
           "langchain-ai/langchain": {
-            "total_files": 20,
-            "valid_files": 20,
+            "total_files": 12,
+            "valid_files": 12,
             "has_donot": true,
             "file_paths": [
               ".claude/CLAUDE.md",
               ".claude/rules/do-not.md",
-              ".claude/rules/**/architecture.md",
-              ".claude/rules/**/domain.md",
-              ".claude/rules/**/style.md",
-              ".claude/rules/**/workflow.md",
-              ".claude/rules/architecture.md",
               ".claude/rules/code-style.md",
-              ".claude/rules/domain.md",
-              ".claude/rules/libs/architecture.md"
+              ".claude/rules/testing.md",
+              ".claude/rules/workflow.md",
+              ".claude/rules/ci.md",
+              ".claude/rules/architecture.md",
+              ".claude/rules/security.md",
+              ".claude/rules/partners/integration.md",
+              ".claude/rules/agents/middleware.md"
             ]
           },
           "denoland/deno": {
-            "total_files": 34,
-            "valid_files": 34,
+            "total_files": 22,
+            "valid_files": 22,
             "has_donot": true,
             "file_paths": [
               ".claude/CLAUDE.md",
               ".claude/rules/do-not.md",
-              ".claude/rules/**/architecture.md",
-              ".claude/rules/**/performance.md",
-              ".claude/rules/**/security.md",
-              ".claude/rules/**/style.md",
-              ".claude/rules/**/workflow.md",
-              ".claude/rules/.github/style.md",
-              ".claude/rules/.github/workflow.md",
-              ".claude/rules/architecture.md"
+              ".claude/rules/code-style.md",
+              ".claude/rules/testing.md",
+              ".claude/rules/workflow.md",
+              ".claude/rules/architecture.md",
+              ".claude/rules/domain.md",
+              ".claude/rules/product.md",
+              ".claude/rules/cargo.md",
+              ".claude/rules/cli.md"
             ]
           },
           "prisma/prisma": {
+            "total_files": 15,
+            "valid_files": 15,
+            "has_donot": true,
+            "file_paths": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/code-style.md",
+              ".claude/rules/testing.md",
+              ".claude/rules/do-not.md",
+              ".claude/rules/workflow.md",
+              ".claude/rules/ci.md",
+              ".claude/rules/architecture.md",
+              ".claude/rules/security.md",
+              ".claude/rules/domain.md",
+              ".claude/rules/product.md"
+            ]
+          },
+          "vercel/next.js": {
+            "total_files": 1,
+            "valid_files": 1,
+            "has_donot": false,
+            "file_paths": [
+              ".claude/CLAUDE.md"
+            ]
+          },
+          "facebook/react": {
             "total_files": 19,
             "valid_files": 19,
             "has_donot": true,
             "file_paths": [
               ".claude/CLAUDE.md",
-              ".claude/rules/do-not.md",
               ".claude/rules/code-style.md",
+              ".claude/rules/code-style-typescript.md",
+              ".claude/rules/testing.md",
+              ".claude/rules/workflow.md",
+              ".claude/rules/do-not.md",
+              ".claude/rules/architecture.md",
+              ".claude/rules/architecture/compiler.md",
+              ".claude/rules/architecture/devtools.md",
+              ".claude/rules/architecture/flight-server.md"
+            ]
+          },
+          "anthropics/claude-code": {
+            "total_files": 18,
+            "valid_files": 18,
+            "has_donot": true,
+            "file_paths": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/code-style.md",
+              ".claude/rules/do-not.md",
               ".claude/rules/testing.md",
               ".claude/rules/workflow.md",
               ".claude/rules/architecture.md",
               ".claude/rules/security.md",
-              ".claude/rules/ci.md",
-              ".claude/rules/performance.md",
-              ".claude/rules/client/functional-tests.md"
-            ]
-          },
-          "vercel/next.js": {
-            "total_files": 10,
-            "valid_files": 9,
-            "has_donot": true,
-            "file_paths": [
-              "CLAUDE.md",
-              ".claude/rules/do-not.md",
-              ".claude/rules/testing.md",
-              ".claude/rules/code-style.md",
-              ".claude/rules/architecture.md",
-              ".claude/rules/workflow.md",
-              ".claude/rules/ci.md",
-              ".claude/rules/rust/conventions.md",
-              ".claude/rules/next-core/architecture.md",
-              ".claude/rules/test/conventions.md"
-            ]
-          },
-          "facebook/react": {
-            "total_files": 25,
-            "valid_files": 25,
-            "has_donot": true,
-            "file_paths": [
-              ".claude/CLAUDE.md",
-              ".claude/rules/code-style.md",
-              ".claude/rules/code-style-packages.md",
-              ".claude/rules/code-style-scripts.md",
-              ".claude/rules/code-style-jsx.md",
-              ".claude/rules/code-style-typescript.md",
-              ".claude/rules/testing.md",
-              ".claude/rules/testing-config.md",
-              ".claude/rules/workflow.md",
-              ".claude/rules/workflow-flow.md"
-            ]
-          },
-          "anthropics/claude-code": {
-            "total_files": 25,
-            "valid_files": 25,
-            "has_donot": true,
-            "file_paths": [
-              ".claude/CLAUDE.md",
-              ".claude/rules/do-not.md",
-              ".claude/rules/**/design.md",
-              ".claude/rules/**/domain.md",
-              ".claude/rules/**/product.md",
-              ".claude/rules/.claude/architecture.md",
-              ".claude/rules/.claude/domain.md",
-              ".claude/rules/.devcontainer/architecture.md",
-              ".claude/rules/.devcontainer/security.md",
-              ".claude/rules/.devcontainer/workflow.md"
+              ".claude/rules/domain.md",
+              ".claude/rules/design.md",
+              ".claude/rules/product.md"
             ]
           },
           "anthropics/claude-agent-sdk-python": {
-            "total_files": 13,
-            "valid_files": 13,
+            "total_files": 14,
+            "valid_files": 14,
+            "has_donot": true,
+            "file_paths": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/code-style.md",
+              ".claude/rules/do-not.md",
+              ".claude/rules/testing.md",
+              ".claude/rules/workflow.md",
+              ".claude/rules/architecture.md",
+              ".claude/rules/domain.md",
+              ".claude/rules/design.md",
+              ".claude/rules/product.md",
+              ".claude/rules/ci.md"
+            ]
+          },
+          "openclaw/openclaw": {
+            "total_files": 22,
+            "valid_files": 22,
             "has_donot": true,
             "file_paths": [
               ".claude/CLAUDE.md",
@@ -1007,33 +1003,16 @@
               ".claude/rules/do-not.md",
               ".claude/rules/workflow.md",
               ".claude/rules/architecture.md",
+              ".claude/rules/security.md",
               ".claude/rules/domain.md",
-              ".claude/rules/product.md",
               ".claude/rules/ci.md",
-              ".claude/rules/sdk/types-and-api.md"
-            ]
-          },
-          "openclaw/openclaw": {
-            "total_files": 28,
-            "valid_files": 28,
-            "has_donot": true,
-            "file_paths": [
-              ".claude/CLAUDE.md",
-              ".claude/rules/do-not.md",
-              ".claude/rules/**/architecture.md",
-              ".claude/rules/**/style.md",
-              ".claude/rules/**/testing.md",
-              ".claude/rules/**/workflow.md",
-              ".claude/rules/.github/workflow.md",
-              ".claude/rules/agent/domain.md",
-              ".claude/rules/agents/architecture.md",
-              ".claude/rules/agents/testing.md"
+              ".claude/rules/design.md"
             ]
           }
         }
       },
       "error": null,
-      "duration_seconds": 2557.21
+      "duration_seconds": 2411.82
     },
     {
       "name": "Incremental Extraction",
@@ -1043,37 +1022,37 @@
         "total_attempts": 8,
         "per_repo": {
           "langchain-ai/langchain": {
-            "pr_number": 35067,
+            "pr_number": 35211,
             "new_rules": 0,
-            "new_proposals": 4,
+            "new_proposals": 0,
             "auto_approved_count": 0,
             "confidence_check_passed": true
           },
           "denoland/deno": {
-            "pr_number": 32138,
+            "pr_number": 32161,
             "new_rules": 0,
             "new_proposals": 0,
             "auto_approved_count": 0,
             "confidence_check_passed": true
           },
           "prisma/prisma": {
-            "pr_number": 29089,
-            "new_rules": 2,
-            "new_proposals": 2,
+            "pr_number": 29038,
+            "new_rules": 0,
+            "new_proposals": 0,
             "auto_approved_count": 0,
             "confidence_check_passed": true
           },
           "vercel/next.js": {
-            "pr_number": 89166,
-            "new_rules": 0,
-            "new_proposals": 2,
+            "pr_number": 88959,
+            "new_rules": 1,
+            "new_proposals": 1,
             "auto_approved_count": 0,
             "confidence_check_passed": true
           },
           "facebook/react": {
-            "pr_number": 35720,
+            "pr_number": 30522,
             "new_rules": 0,
-            "new_proposals": 1,
+            "new_proposals": 3,
             "auto_approved_count": 0,
             "confidence_check_passed": true
           },
@@ -1085,23 +1064,23 @@
             "confidence_check_passed": true
           },
           "anthropics/claude-agent-sdk-python": {
-            "pr_number": 485,
-            "new_rules": 0,
-            "new_proposals": 0,
+            "pr_number": 91,
+            "new_rules": 1,
+            "new_proposals": 4,
             "auto_approved_count": 0,
             "confidence_check_passed": true
           },
           "openclaw/openclaw": {
-            "pr_number": 11853,
-            "new_rules": 2,
-            "new_proposals": 3,
+            "pr_number": 11539,
+            "new_rules": 0,
+            "new_proposals": 8,
             "auto_approved_count": 0,
             "confidence_check_passed": true
           }
         }
       },
       "error": null,
-      "duration_seconds": 517.55
+      "duration_seconds": 716.38
     },
     {
       "name": "Outcome Metrics Collection",
@@ -1112,10 +1091,10 @@
         "per_repo": {
           "langchain-ai/langchain": {
             "metrics": {
-              "total_prs": 20,
-              "avg_review_rounds": 0.65,
-              "ci_failure_rate": 0.137,
-              "avg_time_to_merge_hours": 28.5
+              "total_prs": 22,
+              "avg_review_rounds": 0.45,
+              "ci_failure_rate": 0.114,
+              "avg_time_to_merge_hours": 23.8
             },
             "fields_present": 4,
             "values_reasonable": true
@@ -1123,9 +1102,9 @@
           "denoland/deno": {
             "metrics": {
               "total_prs": 42,
-              "avg_review_rounds": 1.93,
+              "avg_review_rounds": 1.8,
               "ci_failure_rate": 0.009,
-              "avg_time_to_merge_hours": 45.3
+              "avg_time_to_merge_hours": 43.9
             },
             "fields_present": 4,
             "values_reasonable": true
@@ -1152,8 +1131,8 @@
           },
           "facebook/react": {
             "metrics": {
-              "total_prs": 27,
-              "avg_review_rounds": 1.59,
+              "total_prs": 26,
+              "avg_review_rounds": 1.58,
               "ci_failure_rate": 0.0,
               "avg_time_to_merge_hours": 13.3
             },
@@ -1182,10 +1161,10 @@
           },
           "openclaw/openclaw": {
             "metrics": {
-              "total_prs": 7,
-              "avg_review_rounds": 1.29,
-              "ci_failure_rate": 0.0,
-              "avg_time_to_merge_hours": 56.2
+              "total_prs": 12,
+              "avg_review_rounds": 0.58,
+              "ci_failure_rate": 0.095,
+              "avg_time_to_merge_hours": 48.2
             },
             "fields_present": 4,
             "values_reasonable": true
@@ -1193,92 +1172,97 @@
         }
       },
       "error": null,
-      "duration_seconds": 357.77
+      "duration_seconds": 362.64
     },
     {
       "name": "Domain Knowledge Extraction",
-      "score": 0.7806,
+      "score": 0.8083,
       "details": {
-        "repos_with_domain_rules": 6,
-        "total_domain_rules": 191,
+        "repos_with_domain_rules": 7,
+        "total_domain_rules": 219,
         "total_repos": 8,
         "sub_evals": {
           "7a_content_quality": {
             "weight": 0.3,
-            "score": 0.8325,
+            "score": 0.9229,
             "per_repo": {
               "langchain-ai/langchain": {
-                "rules_sampled": 10,
-                "avg_specificity": 4.5,
-                "avg_actionability": 3.9,
-                "score": 0.84
+                "skipped": true,
+                "reason": "no domain rules"
               },
               "denoland/deno": {
                 "rules_sampled": 10,
-                "avg_specificity": 4.4,
-                "avg_actionability": 3.3,
-                "score": 0.77
+                "avg_specificity": 4.9,
+                "avg_actionability": 4.3,
+                "score": 0.92
               },
               "prisma/prisma": {
-                "skipped": true,
-                "reason": "no domain rules"
+                "rules_sampled": 10,
+                "avg_specificity": 4.7,
+                "avg_actionability": 3.9,
+                "score": 0.86
               },
               "vercel/next.js": {
-                "skipped": true,
-                "reason": "no domain rules"
+                "rules_sampled": 10,
+                "avg_specificity": 4.9,
+                "avg_actionability": 4.6,
+                "score": 0.95
               },
               "facebook/react": {
-                "rules_sampled": 10,
-                "avg_specificity": 3.8,
-                "avg_actionability": 2.7,
-                "score": 0.65
+                "rules_sampled": 1,
+                "avg_specificity": 5.0,
+                "avg_actionability": 5.0,
+                "score": 1.0
               },
               "anthropics/claude-code": {
                 "rules_sampled": 10,
-                "avg_specificity": 4.9,
-                "avg_actionability": 4.1,
-                "score": 0.9
+                "avg_specificity": 4.5,
+                "avg_actionability": 4.2,
+                "score": 0.87
               },
               "anthropics/claude-agent-sdk-python": {
                 "rules_sampled": 10,
-                "avg_specificity": 4.9,
-                "avg_actionability": 4.2,
-                "score": 0.91
+                "avg_specificity": 5.0,
+                "avg_actionability": 4.3,
+                "score": 0.93
               },
               "openclaw/openclaw": {
-                "rules_sampled": 8,
+                "rules_sampled": 10,
                 "avg_specificity": 5.0,
-                "avg_actionability": 4.25,
-                "score": 0.925
+                "avg_actionability": 4.3,
+                "score": 0.93
               }
             }
           },
           "7b_domain_coverage": {
             "weight": 0.25,
-            "score": 0.4833,
+            "score": 0.5143,
             "per_repo": {
               "langchain-ai/langchain": {
-                "rules_count": 21,
-                "has_readme": true,
-                "completeness": 4,
-                "depth": 6,
-                "score": 0.5
+                "skipped": true,
+                "reason": "no domain rules"
               },
               "denoland/deno": {
-                "rules_count": 38,
+                "rules_count": 45,
                 "llm_failed": true,
                 "score": 0.5
               },
               "prisma/prisma": {
-                "skipped": true,
-                "reason": "no domain rules"
+                "rules_count": 29,
+                "has_readme": true,
+                "completeness": 6,
+                "depth": 7,
+                "score": 0.65
               },
               "vercel/next.js": {
-                "skipped": true,
-                "reason": "no domain rules"
+                "rules_count": 17,
+                "has_readme": true,
+                "completeness": 5,
+                "depth": 4,
+                "score": 0.45
               },
               "facebook/react": {
-                "rules_count": 22,
+                "rules_count": 1,
                 "has_readme": true,
                 "completeness": 2,
                 "depth": 3,
@@ -1286,20 +1270,22 @@
               },
               "anthropics/claude-code": {
                 "rules_count": 44,
-                "llm_failed": true,
+                "has_readme": true,
+                "completeness": 2,
+                "depth": 8,
                 "score": 0.5
               },
               "anthropics/claude-agent-sdk-python": {
-                "rules_count": 58,
-                "has_readme": true,
-                "completeness": 6,
-                "depth": 7,
-                "score": 0.65
-              },
-              "openclaw/openclaw": {
-                "rules_count": 8,
+                "rules_count": 48,
                 "llm_failed": true,
                 "score": 0.5
+              },
+              "openclaw/openclaw": {
+                "rules_count": 35,
+                "has_readme": true,
+                "completeness": 7,
+                "depth": 8,
+                "score": 0.75
               }
             }
           },
@@ -1308,115 +1294,122 @@
             "score": 0.8,
             "per_repo": {
               "langchain-ai/langchain": {
-                "domain_avg_conf": 0.881,
-                "code_avg_conf": 0.924,
-                "conf_spread": 0.0335,
-                "calibrated": true,
-                "differentiated": true,
-                "no_ceiling": true,
-                "score": 1.0
+                "skipped": true,
+                "reason": "no domain rules"
               },
               "denoland/deno": {
-                "domain_avg_conf": 0.868,
-                "code_avg_conf": 0.906,
-                "conf_spread": 0.0337,
+                "domain_avg_conf": 0.848,
+                "code_avg_conf": 0.896,
+                "conf_spread": 0.0391,
                 "calibrated": true,
                 "differentiated": true,
                 "no_ceiling": true,
                 "score": 1.0
               },
               "prisma/prisma": {
-                "skipped": true,
-                "reason": "no domain rules"
+                "domain_avg_conf": 0.876,
+                "code_avg_conf": 0.88,
+                "conf_spread": 0.0344,
+                "calibrated": true,
+                "differentiated": true,
+                "no_ceiling": true,
+                "score": 1.0
               },
               "vercel/next.js": {
-                "skipped": true,
-                "reason": "no domain rules"
+                "domain_avg_conf": 0.897,
+                "code_avg_conf": 0.866,
+                "conf_spread": 0.0121,
+                "calibrated": false,
+                "differentiated": false,
+                "no_ceiling": true,
+                "score": 0.2
               },
               "facebook/react": {
-                "domain_avg_conf": 0.841,
-                "code_avg_conf": 0.879,
-                "conf_spread": 0.0197,
+                "domain_avg_conf": 0.85,
+                "code_avg_conf": 0.874,
+                "conf_spread": 0.0,
                 "calibrated": true,
                 "differentiated": false,
                 "no_ceiling": true,
                 "score": 0.7
               },
               "anthropics/claude-code": {
-                "domain_avg_conf": 0.84,
-                "code_avg_conf": 0.917,
-                "conf_spread": 0.0297,
+                "domain_avg_conf": 0.838,
+                "code_avg_conf": 0.905,
+                "conf_spread": 0.0391,
                 "calibrated": true,
-                "differentiated": false,
+                "differentiated": true,
                 "no_ceiling": true,
-                "score": 0.7
+                "score": 1.0
               },
               "anthropics/claude-agent-sdk-python": {
-                "domain_avg_conf": 0.867,
-                "code_avg_conf": 0.92,
-                "conf_spread": 0.0257,
+                "domain_avg_conf": 0.868,
+                "code_avg_conf": 0.892,
+                "conf_spread": 0.0263,
                 "calibrated": true,
                 "differentiated": false,
                 "no_ceiling": true,
                 "score": 0.7
               },
               "openclaw/openclaw": {
-                "domain_avg_conf": 0.894,
-                "code_avg_conf": 0.905,
-                "conf_spread": 0.0177,
+                "domain_avg_conf": 0.837,
+                "code_avg_conf": 0.889,
+                "conf_spread": 0.0408,
                 "calibrated": true,
-                "differentiated": false,
+                "differentiated": true,
                 "no_ceiling": true,
-                "score": 0.7
+                "score": 1.0
               }
             }
           },
           "7d_category_accuracy": {
             "weight": 0.15,
-            "score": 0.9333,
+            "score": 0.8857,
             "per_repo": {
               "langchain-ai/langchain": {
+                "skipped": true,
+                "reason": "no domain rules"
+              },
+              "denoland/deno": {
                 "rules_sampled": 10,
                 "matches": 10,
                 "total_judged": 10,
                 "accuracy": 1.0
               },
-              "denoland/deno": {
+              "prisma/prisma": {
+                "rules_sampled": 10,
+                "matches": 10,
+                "total_judged": 10,
+                "accuracy": 1.0
+              },
+              "vercel/next.js": {
+                "rules_sampled": 10,
+                "matches": 8,
+                "total_judged": 10,
+                "accuracy": 0.8
+              },
+              "facebook/react": {
+                "rules_sampled": 1,
+                "matches": 1,
+                "total_judged": 1,
+                "accuracy": 1.0
+              },
+              "anthropics/claude-code": {
                 "rules_sampled": 10,
                 "matches": 9,
                 "total_judged": 10,
                 "accuracy": 0.9
               },
-              "prisma/prisma": {
-                "skipped": true,
-                "reason": "no domain rules"
-              },
-              "vercel/next.js": {
-                "skipped": true,
-                "reason": "no domain rules"
-              },
-              "facebook/react": {
-                "rules_sampled": 10,
-                "matches": 7,
-                "total_judged": 10,
-                "accuracy": 0.7
-              },
-              "anthropics/claude-code": {
-                "rules_sampled": 10,
-                "matches": 10,
-                "total_judged": 10,
-                "accuracy": 1.0
-              },
               "anthropics/claude-agent-sdk-python": {
                 "rules_sampled": 10,
-                "matches": 10,
+                "matches": 5,
                 "total_judged": 10,
-                "accuracy": 1.0
+                "accuracy": 0.5
               },
               "openclaw/openclaw": {
-                "rules_sampled": 8,
-                "matches": 8,
-                "total_judged": 8,
+                "rules_sampled": 10,
+                "matches": 10,
+                "total_judged": 10,
                 "accuracy": 1.0
               }
             }
@@ -1424,8 +1417,8 @@
           "7e_db_schema_selftest": {
             "weight": 0.15,
             "score": 1.0,
-            "agent_output_length": 1556,
-            "rules_extracted": 10,
+            "agent_output_length": 3934,
+            "rules_extracted": 22,
             "facts_found": 5,
             "total_expected_facts": 5,
             "fact_results": [
@@ -1465,111 +1458,118 @@
         }
       },
       "error": null,
-      "duration_seconds": 348.03
+      "duration_seconds": 399.43
     },
     {
       "name": "Ground Truth Recall",
-      "score": 0.3717,
+      "score": 0.4694,
       "details": {
         "repos_with_ground_truth": 7,
         "total_repos": 8,
-        "avg_recall": 0.3717,
+        "avg_recall": 0.4694,
         "per_repo": {
           "langchain-ai/langchain": {
-            "total_rules": 154,
-            "contaminated": 71,
-            "independent": 83,
-            "total_guidelines": 16,
-            "matched": 13.5,
-            "recall": 0.8438,
+            "total_rules": 87,
+            "contaminated": 0,
+            "independent": 87,
+            "total_guidelines": 26,
+            "matched": 16.5,
+            "recall": 0.6346,
             "unmatched_examples": [
-              "[ ] Tests fail when your new logic is broken (incomplete checklist item, appears truncated)",
-              "Check if the function/class is exported in `__init__.py` (before making API changes)",
-              "Use keyword-only arguments for new parameters: `*, new_param: str = \"default\"`"
+              "PR descriptions must include AI disclaimer",
+              "PR descriptions should describe the 'why', limit prose, highlight areas needing review",
+              "CRITICAL: Preserve function signatures, argument positions, and names for public methods - no breaking changes",
+              "Warn developer for any function signature changes",
+              "Check if function/class is exported in __init__.py before changes"
             ],
             "matched_examples": [
-              "Monorepo structure with libs/core/, libs/langchain/, libs/partners/, etc. (1.0 - rule 3 describes partners/ separation)",
-              "Use `uv` for dependency management (1.0 - rules 5, 21)",
-              "Run `make test` for unit tests (1.0 - rules 8, 23)",
-              "Run `make lint` and `make format` (1.0 - rules 9, 10, 25, 27)",
-              "Run `make format`, `make lint`, `make test` before PR submission (1.0 - rule 42)"
+              "Monorepo uses uv for dependency management (1.0)",
+              "Run uv sync --all-groups or uv sync --group test before tests (1.0)",
+              "Run make test for unit tests (1.0)",
+              "Run make lint for linting (1.0)",
+              "Run make format for formatting (1.0)"
             ],
-            "score": 0.84375
+            "score": 0.6346153846153846
           },
           "denoland/deno": {
-            "total_rules": 207,
-            "contaminated": 66,
-            "independent": 141,
+            "total_rules": 126,
+            "contaminated": 8,
+            "independent": 118,
             "total_guidelines": 50,
-            "matched": 0.0,
-            "recall": 0.0,
+            "matched": 19.5,
+            "recall": 0.39,
             "unmatched_examples": [
-              "Store build artifacts with 3-day retention for testing but not long-term storage",
-              "Use actions/cache/restore for PR builds and actions/cache/save for main branch to optimize cache strategy",
-              "Exclude **/.claude/settings.local.json to keep Claude Code local settings out of version control",
-              "Exclude flamegraph*.svg and flamebench*.svg performance profiling outputs from version control",
-              "Exclude .ipynb_checkpoints/ and Untitled*.ipynb from version control"
+              "NEVER add hacky workarounds to make failing Node.js compatibility tests pass \u2014 prefer marking them as ignored in tests/node_compat/config.jsonc",
+              "Use the Rust toolchain version specified in rust-toolchain.toml (currently 1.92.0 with rustfmt and clippy components)",
+              "CI workflow (.github/workflows/ci.yml) is generated by ./ci.generate.ts \u2014 NEVER edit ci.yml directly",
+              "Benchmarks only run when the 'ci-bench' label is applied to a PR or on main branch commits",
+              "Draft PRs skip CI builds by default unless they contain '[ci]' in the commit message or have the 'ci-draft' label"
             ],
-            "matched_examples": [],
-            "score": 0.0
+            "matched_examples": [
+              "Key Directories: cli/, runtime/, ext/, tests/specs/, tests/unit/, tests/testdata/ (1.0)",
+              "cargo build to compile after making changes (1.0)",
+              "cargo build --bin deno for faster iteration during development (1.0)",
+              "./target/debug/deno eval for executing development build (1.0)",
+              "./target/debug/deno run path/to/file.ts to run a local file (1.0)"
+            ],
+            "score": 0.39
           },
           "prisma/prisma": {
-            "total_rules": 99,
-            "contaminated": 30,
-            "independent": 69,
-            "total_guidelines": 46,
-            "matched": 24.5,
-            "recall": 0.5326,
+            "total_rules": 80,
+            "contaminated": 0,
+            "independent": 80,
+            "total_guidelines": 24,
+            "matched": 8.0,
+            "recall": 0.3333,
             "unmatched_examples": [
-              "Repository is a monorepo for Prisma ORM with TypeScript, Rust, WASM, TSX, Jest, pnpm",
-              "Managed via pnpm workspaces and Turborepo",
-              "Top-level scripts delegate to scripts/ci/publish.ts",
-              "Package-specific commands use `pnpm --filter @prisma/<pkg> <script>`",
-              "Run `pnpm build` from root to build all packages in dependency order"
+              "Run `pnpm bench` to run all benchmarks",
+              "Run `pnpm bench <pattern>` to run benchmarks matching pattern",
+              "Benchmark locations: query-performance.bench.ts, compilation.bench.ts, interpreter.bench.ts, huge-schema/, lots-of-relations/",
+              "CodSpeed tracks performance and alerts on >100% regression",
+              "Docker services from docker/docker-compose.yml required for DB tests"
             ],
             "matched_examples": [
-              "Node ^20.19 || ^22.12 || >=24.0 required (1.0) - matches rule 12 about CI running Node 20.19.0, 22.12.0, and 24",
-              "pnpm >=10.15 <11 required (1.0) - matches rule 18 exactly",
-              "Turborepo caches builds (1.0) - matches rule 28 about Turborepo caching configuration",
-              "CI tests driver adapters with specific flavors (1.0) - matches rule 11 listing js_pg, js_neon, etc.",
-              "TypeScript-first repo with WASM/Rust assets (0.5) - partially matches rule 5 about WASM engine builds"
+              "Node version ^20.19 || ^22.12 || >=24.0 required (1.0)",
+              "pnpm >=10.15 <11 required (1.0)",
+              "Use pnpm, never npm/yarn (1.0)",
+              "Use pnpm workspaces (1.0)",
+              "Run `pnpm build` from root (1.0)"
             ],
-            "score": 0.532608695652174
+            "score": 0.3333333333333333
           },
           "vercel/next.js": {
-            "total_rules": 77,
-            "contaminated": 29,
-            "independent": 48,
-            "total_guidelines": 48,
-            "matched": 19.5,
-            "recall": 0.4062,
+            "total_rules": 154,
+            "contaminated": 0,
+            "independent": 154,
+            "total_guidelines": 26,
+            "matched": 14.5,
+            "recall": 0.5577,
             "unmatched_examples": [
-              "Tests run in parallel groups (e.g., 1/7, 2/7, etc.) using node run-tests.js -g flag for load distribution",
-              "CI tests against multiple React versions including default and React 18.3.1 - use NEXT_TEST_REACT_VERSION environment variable to specify version",
-              "CI builds and tests both Turbopack and Webpack variants - use environment variables IS_TURBOPACK_TEST=1 and TURBOPACK_DEV=1 or TURBOPACK_BUILD=1 for Turbopack testing",
-              "CI skips builds and tests for docs-only changes (changes only to documentation files)",
-              "Clippy lint 'too_many_arguments' is explicitly allowed at workspace level"
+              "NEXT_SKIP_ISOLATE=1 - skip packing Next.js for each test (much faster)",
+              "testonly - runs with --runInBand (no worker isolation overhead)",
+              "Always rebuild after switching branches: git checkout <branch> && pnpm build",
+              "Only use full pnpm --filter=next build for one-off builds (after branch switch, before CI push)",
+              "When done with watch mode, kill the background watch process"
             ],
             "matched_examples": [
-              "Build commands: pnpm --filter=next build and pnpm build (1.0)",
-              "Build specific task with pnpm --filter=next exec taskr <task> (1.0)",
-              "Fast local development with pnpm --filter=next dev watch mode (1.0)",
-              "Run tests fast with NEXT_SKIP_ISOLATE=1 NEXT_TEST_MODE=dev pnpm testonly (1.0)",
-              "Always rebuild after switching branches with pnpm build (1.0)"
+              "pnpm --filter=next build - Build the Next.js package (1.0)",
+              "pnpm build - Build everything (1.0)",
+              "pnpm test-dev-turbo test/path/to/test.test.ts - Run specific test file (1.0)",
+              "pnpm test-dev-turbo -t \"pattern\" - Run tests matching pattern (0.5)",
+              "pnpm test-dev-turbo - Development mode with Turbopack (1.0)"
             ],
-            "score": 0.40625
+            "score": 0.5576923076923077
           },
           "facebook/react": {
-            "total_rules": 87,
-            "contaminated": 2,
-            "independent": 85,
-            "total_guidelines": 3,
+            "total_rules": 64,
+            "contaminated": 0,
+            "independent": 64,
+            "total_guidelines": 2,
             "matched": 0.0,
             "recall": 0.0,
             "unmatched_examples": [
               "React is a JavaScript library for building user interfaces",
-              "React: All files outside `/compiler/`",
-              "React Compiler: `/compiler/` directory (has its own instructions)"
+              "Monorepo structure: React files outside /compiler/, React Compiler in /compiler/ directory with separate instructions"
             ],
             "matched_examples": [],
             "score": 0.0
@@ -1579,55 +1579,55 @@
             "reason": "no CLAUDE.md or AGENTS.md found"
           },
           "anthropics/claude-agent-sdk-python": {
-            "total_rules": 118,
-            "contaminated": 14,
-            "independent": 104,
-            "total_guidelines": 12,
-            "matched": 4.0,
-            "recall": 0.3333,
+            "total_rules": 108,
+            "contaminated": 2,
+            "independent": 106,
+            "total_guidelines": 11,
+            "matched": 5.5,
+            "recall": 0.5,
             "unmatched_examples": [
-              "Run `python -m pytest tests/test_client.py` to run specific test file",
-              "`client.py` contains ClaudeSDKClient for interactive sessions",
-              "`query.py` contains one-shot query function",
-              "`types.py` contains type definitions",
-              "`_internal/` contains internal implementation details"
+              "Codebase Structure: src/claude_agent_sdk/ - Main package",
+              "Codebase Structure: client.py - ClaudeSDKClient for interactive sessions",
+              "Codebase Structure: query.py - One-shot query function",
+              "Codebase Structure: types.py - Type definitions",
+              "Codebase Structure: _internal/ - Internal implementation details"
             ],
             "matched_examples": [
-              "Run `python -m pytest tests/` to run all tests (1.0)",
-              "Main package is in `src/claude_agent_sdk/` (1.0)",
-              "Run `python -m ruff check src/ tests/ --fix` to check and fix linting issues (0.5)",
-              "Run `python -m ruff format src/ tests/` to format code (0.5)",
-              "Run `python -m mypy src/` for typechecking (0.5)"
+              "python -m ruff check src/ tests/ --fix (1.0) - matched by rule 24 (ruff check) and workflow patterns",
+              "python -m ruff format src/ tests/ (1.0) - matched by rule 23 (ruff format --check)",
+              "python -m mypy src/ (1.0) - matched exactly by rule 22",
+              "python -m pytest tests/ (1.0) - matched by rule 25 (pytest tests/)",
+              "python -m pytest tests/test_client.py (0.5) - partially matched by rule 25 (pytest tests/) and rule 19 (test_ prefix naming)"
             ],
-            "score": 0.3333333333333333
+            "score": 0.5
           },
           "openclaw/openclaw": {
-            "total_rules": 146,
-            "contaminated": 63,
-            "independent": 83,
-            "total_guidelines": 108,
-            "matched": 52.5,
-            "recall": 0.4861,
+            "total_rules": 102,
+            "contaminated": 0,
+            "independent": 102,
+            "total_guidelines": 50,
+            "matched": 43.5,
+            "recall": 0.87,
             "unmatched_examples": [
-              "Repo: https://github.com/openclaw/openclaw",
-              "GitHub issues/comments/PR comments: use literal multiline strings or `-F - <<'EOF'` (or $'...') for real newlines; never embed \"\\n\".",
-              "Source code: `src/` (CLI wiring in `src/cli`, commands in `src/commands`, web provider in `src/provider-web.ts`, infra in `src/infra`, media pipeline in `src/media`).",
-              "Tests: colocated `*.test.ts`.",
-              "Docs: `docs/` (images, queue, Pi config). Built output lives in `dist/`."
+              "Installers served from https://openclaw.ai/*: live in the sibling repo ../openclaw.ai",
+              "When adding channels/extensions/apps/docs, update .github/labeler.yml and create matching GitHub labels",
+              "Docs i18n (zh-CN): docs/zh-CN/** is generated; do not edit unless the user explicitly asks. Pipeline: update English \u2192 adjust glossary \u2192 run scripts/docs-i18n",
+              "exe.dev VM ops: Access via ssh exe.dev then ssh vm-name; restart with pkill -9 -f openclaw-gateway || true; nohup openclaw gateway run --bind loopback --port 18789 --force",
+              "Mac packaging (dev): scripts/package-mac-app.sh defaults to current arch. Release checklist: docs/platforms/mac/release.md"
             ],
             "matched_examples": [
-              "Test setup file at test/setup.ts is loaded before all tests (1.0)",
-              "Run `pnpm check:docs` when docs files change (1.0)",
-              "Run `pnpm release:check` on push to main (1.0)",
-              "Gateway binds to loopback by default (1.0)",
-              "Docker runs as non-root user (USER node) (0.5)"
+              "Run pnpm check before commits (1.0)",
+              "Node.js version must be >=22.12.0 / Node 22+ (1.0)",
+              "Use oxlint for linting TypeScript/JavaScript \u2014 NEVER use ESLint. typescript/no-explicit-any rule set to error (1.0)",
+              "Use oxfmt for code formatting \u2014 NEVER use Prettier. experimentalSortImports enabled (1.0)",
+              "Use pnpm as the package manager (version 10.23.0) \u2014 NEVER use npm or yarn. pnpm-lock.yaml lockfile (1.0)"
             ],
-            "score": 0.4861111111111111
+            "score": 0.87
           }
         }
       },
       "error": null,
-      "duration_seconds": 181.82
+      "duration_seconds": 142.7
     }
   ]
 }
