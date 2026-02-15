@@ -1462,8 +1462,10 @@ async def main():
     # Initialize database
     if not args.skip_extraction:
         print("[setup] Deleting existing DB for clean eval...")
-        if DB_PATH.exists():
-            DB_PATH.unlink()
+        for suffix in ("", "-shm", "-wal"):
+            p = DB_PATH.parent / (DB_PATH.name + suffix)
+            if p.exists():
+                p.unlink()
 
     print("[setup] Initializing database...")
     await db.init_db()

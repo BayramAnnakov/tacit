@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-02-13T20:55:55.323013+00:00",
+  "timestamp": "2026-02-15T07:02:32.781198+00:00",
   "repos": [
     "langchain-ai/langchain",
     "denoland/deno",
@@ -7,27 +7,69 @@
     "vercel/next.js",
     "facebook/react",
     "anthropics/claude-code",
+    "anthropics/claude-agent-sdk-python",
     "openclaw/openclaw"
   ],
-  "overall_score": 0.7102,
+  "overall_score": 0.8159,
   "evals": [
     {
       "name": "Anti-Pattern Mining",
-      "score": 0.7143,
+      "score": 0.875,
       "details": {
-        "repos_with_patterns": 5,
-        "total_repos": 7,
-        "avg_patterns_per_repo": 4.0,
-        "total_patterns": 28,
+        "repos_with_patterns": 7,
+        "total_repos": 8,
+        "avg_patterns_per_repo": 4.5,
+        "total_patterns": 36,
         "per_repo": {
           "langchain-ai/langchain": {
-            "patterns_found": 0,
-            "valid_patterns": 0,
-            "sample": []
+            "patterns_found": 1,
+            "valid_patterns": 1,
+            "sample": [
+              {
+                "pr_number": 35067,
+                "pr_title": "fix(openai): preserve reasoning_content from OpenAI-compatible providers",
+                "author": "saakshigupta2002",
+                "merged": false,
+                "has_formal_rejection": false,
+                "review_bodies": [],
+                "inline_review_comments": [
+                  {
+                    "author": "keenborder786",
+                    "body": "why do we need this? If you have already have preserved the reasoning_content above for the given chunk???? This is the only difference that I can see from PR #35065, the changes are duplicates. ",
+                    "path": "libs/partners/openai/langchain_openai/chat_models/base.py",
+                    "diff_hunk": "@@ -1503,6 +1509,21 @@ def _create_chat_result(\n                 generations[0].message.additional_kwargs[\"parsed\"] = message.parsed\n             if hasattr(message, \"refusal\"):\n                 generations[0].message.additional_kwargs[\"refusal\"] = message.refusal\n+            if (",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "saakshigupta2002",
+                    "body": "\r\n@keenborder786 The issue is that even though line 1476 calls `_convert_dict_to_message` (which now extracts `reasoning_content`), the dict it receives from `response.model_dump()` at line 1452 often doesn't actually contain `reasoning_content` - the OpenAI SDK leaves it as an attribute on the raw response object instead. Lines 1504-1526 are the fallback that grabs it directly from those attributes when the dict path misses it. DeepSeek does the same thing (lines 281-311 in their code) and you ",
+                    "path": "libs/partners/openai/langchain_openai/chat_models/base.py",
+                    "diff_hunk": "@@ -1503,6 +1509,21 @@ def _create_chat_result(\n                 generations[0].message.additional_kwargs[\"parsed\"] = message.parsed\n             if hasattr(message, \"refusal\"):\n                 generations[0].message.additional_kwargs[\"refusal\"] = message.refusal\n+            if (",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "keenborder786",
+                    "body": "@saakshigupta2002 `often doesn't actually contain reasoning_content` can you please share the Doc link for this or wherever you have referred this from?\r\nPlus have you double-tested with both `vLLM` and `OpenAI` directly to make sure `reasoning_content` is being extracted?",
+                    "path": "libs/partners/openai/langchain_openai/chat_models/base.py",
+                    "diff_hunk": "@@ -1503,6 +1509,21 @@ def _create_chat_result(\n                 generations[0].message.additional_kwargs[\"parsed\"] = message.parsed\n             if hasattr(message, \"refusal\"):\n                 generations[0].message.additional_kwargs[\"refusal\"] = message.refusal\n+            if (",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "saakshigupta2002",
+                    "body": "> @saakshigupta2002 `often doesn't actually contain reasoning_content` can you please share the Doc link for this or wherever you have referred this from? Plus have you double-tested with both `vLLM` and `OpenAI` directly to make sure `reasoning_content` is being extracted?\r\n\r\n@keenborder786 Sure! The reason `model_dump()` can drop extra fields like `reasoning_content` is because of how Pydantic v2 handles them like extra fields get stored in `model_extra` but are excluded from serialization by ",
+                    "path": "libs/partners/openai/langchain_openai/chat_models/base.py",
+                    "diff_hunk": "@@ -1503,6 +1509,21 @@ def _create_chat_result(\n                 generations[0].message.additional_kwargs[\"parsed\"] = message.parsed\n             if hasattr(message, \"refusal\"):\n                 generations[0].message.additional_kwargs[\"refusal\"] = message.refusal\n+            if (",
+                    "has_suggestion_block": false
+                  }
+                ],
+                "total_review_comments": 4,
+                "review_rounds": 4
+              }
+            ]
           },
           "denoland/deno": {
-            "patterns_found": 5,
-            "valid_patterns": 5,
+            "patterns_found": 4,
+            "valid_patterns": 4,
             "sample": [
               {
                 "pr_number": 31867,
@@ -461,178 +503,150 @@
             ]
           },
           "vercel/next.js": {
-            "patterns_found": 4,
-            "valid_patterns": 4,
+            "patterns_found": 9,
+            "valid_patterns": 9,
             "sample": [
               {
-                "pr_number": 89874,
-                "pr_title": "Turbopack: Use `std::any::type_name` for global naming of turbo-task items",
-                "author": "bgw",
+                "pr_number": 89166,
+                "pr_title": "fix(agents-md): use `require.resolve()` to get the installed `next` version",
+                "author": "devjiwonchoi",
                 "merged": true,
                 "has_formal_rejection": false,
                 "review_bodies": [],
                 "inline_review_comments": [
                   {
                     "author": "vercel[bot]",
-                    "body": "```suggestion\n                AtomicBool::store(&ONLY_RUN_ONCE, true, Ordering::Release);\n```\n\nThe `ONLY_RUN_ONCE` debug guard in the `global_name!` macro stores `false` instead of `true`, making it never detect duplicate invocations.\n<!-- VADE-CATEGORY: logic -->\n<!-- VADE-GITHUB-SUGGESTION-ID:8eebfb8ac2a30f2e1215a4fe741ce3d7e80c546ce36c5d24339c209fa95adc55 -->\n\n<!-- VADE-RECOMMENDATION: SUGGESTION -->\n<a href=\"https://vercel.com/vercel/~/agent/tasks/62007183-7e29-40c0-98dd-cf551ae92af0#suggest",
-                    "path": "turbopack/crates/turbo-tasks/src/macro_helpers.rs",
-                    "diff_hunk": "@@ -193,21 +198,37 @@ macro_rules! inventory_submit {\n #[doc(hidden)]\n pub use inventory::submit as inventory_submit_inner;\n \n-/// Define a global name for a turbo-tasks value.\n-#[cfg(not(rust_analyzer))] // ignore-rust-analyzer due to https://github.com/rust-lang/rust-analyzer/issues/19993\n-#[macro_export]\n-macro_rules! global_name {\n-    ($($item:tt)*) => {\n-\n-        ::std::concat!(::std::env!(",
-                    "has_suggestion_block": true
+                    "body": "Missing return statement in `getNextjsVersion` when `pkg.version` is falsy causes function to return `undefined` instead of `NextjsVersionResult`\n<!-- VADE-CATEGORY: logic -->\n<!-- VADE-GITHUB-SUGGESTION-ID:e4bc8d1246d6455bd9265cf7ecb2a3ab723436e9355e36cff924b442ee983ef0 -->\n\n<!-- VADE-RECOMMENDATION: FIX -->\n<a href=\"https://vercel.com/vercel/~/agent/tasks/64e5e113-ab17-443c-85a2-67a21b018902#suggestion-e4bc8d1246d6455bd9265cf7ecb2a3ab723436e9355e36cff924b442ee983ef0\" rel=\"noreferrer\">\n  <pictu",
+                    "path": "packages/next-codemod/lib/agents-md.ts",
+                    "diff_hunk": "@@ -16,27 +16,13 @@ interface NextjsVersionResult {\n }\n \n export function getNextjsVersion(cwd: string): NextjsVersionResult {\n-  const packageJsonPath = path.join(cwd, 'package.json')\n-\n-  if (!fs.existsSync(packageJsonPath)) {\n-    return {\n-      version: null,\n-      error: 'No package.json found in the current directory',\n-    }\n-  }",
+                    "has_suggestion_block": false
                   },
                   {
-                    "author": "vercel[bot]",
-                    "body": "```suggestion\n\n```\n\nDebug `eprintln!(\"{}\", value_name)` statement left in production code prints every trait method's value name to stderr during initialization.\n<!-- VADE-CATEGORY: code-style -->\n<!-- VADE-GITHUB-SUGGESTION-ID:8c47c0512c2bce95cfeaa4c6fca37f69010b1566198a5fb499ba2c732f4bc60a -->\n\n<!-- VADE-RECOMMENDATION: SUGGESTION -->\n<a href=\"https://vercel.com/vercel/~/agent/tasks/62007183-7e29-40c0-98dd-cf551ae92af0#suggestion-8c47c0512c2bce95cfeaa4c6fca37f69010b1566198a5fb499ba2c732f4bc60a",
-                    "path": "turbopack/crates/turbo-tasks/src/macro_helpers.rs",
-                    "diff_hunk": "@@ -142,32 +142,37 @@ inventory::collect! {CollectableTraitCastFunctions}\n \n #[allow(clippy::type_complexity)]\n pub struct CollectableTraitMethods(\n-    // A value type name\n-    pub &'static str,\n-    pub fn() -> (TraitTypeId, Vec<(&'static str, &'static NativeFunction)>),\n+    pub  fn() -> (\n+        &'static str, // A value type name\n+        TraitTypeId,\n+        Vec<(&'static str, &'static Na",
-                    "has_suggestion_block": true
+                    "author": "gaojude",
+                    "body": "this is smart. only part that's missing is the test.",
+                    "path": "packages/next-codemod/lib/agents-md.ts",
+                    "diff_hunk": "@@ -16,27 +16,13 @@ interface NextjsVersionResult {\n }\n \n export function getNextjsVersion(cwd: string): NextjsVersionResult {\n-  const packageJsonPath = path.join(cwd, 'package.json')\n-\n-  if (!fs.existsSync(packageJsonPath)) {\n-    return {\n-      version: null,\n-      error: 'No package.json found in the current directory',\n-    }\n-  }\n-\n   try {\n-    const packageJson = JSON.parse(fs.readFileS",
+                    "has_suggestion_block": false
                   },
                   {
-                    "author": "vercel[bot]",
-                    "body": "The bug has been fixed in a new commit. Line 219 now correctly stores `true` via `AtomicBool::store(&ONLY_RUN_ONCE, true, Ordering::Release)`. The macro was also renamed to `global_name_for_scope`.",
-                    "path": "turbopack/crates/turbo-tasks/src/macro_helpers.rs",
-                    "diff_hunk": "@@ -193,21 +198,37 @@ macro_rules! inventory_submit {\n #[doc(hidden)]\n pub use inventory::submit as inventory_submit_inner;\n \n-/// Define a global name for a turbo-tasks value.\n-#[cfg(not(rust_analyzer))] // ignore-rust-analyzer due to https://github.com/rust-lang/rust-analyzer/issues/19993\n-#[macro_export]\n-macro_rules! global_name {\n-    ($($item:tt)*) => {\n-\n-        ::std::concat!(::std::env!(",
+                    "author": "gaojude",
+                    "body": "also need to update `findNextjsInWorkspace` to this logic",
+                    "path": "packages/next-codemod/lib/agents-md.ts",
+                    "diff_hunk": "@@ -16,27 +16,13 @@ interface NextjsVersionResult {\n }\n \n export function getNextjsVersion(cwd: string): NextjsVersionResult {\n-  const packageJsonPath = path.join(cwd, 'package.json')\n-\n-  if (!fs.existsSync(packageJsonPath)) {\n-    return {\n-      version: null,\n-      error: 'No package.json found in the current directory',\n-    }\n-  }\n-\n   try {\n-    const packageJson = JSON.parse(fs.readFileS",
                     "has_suggestion_block": false
                   },
                   {
                     "author": "vercel[bot]",
-                    "body": "The `eprintln!(\"{}\", value_name)` debug statement has been removed from `turbopack/crates/turbo-tasks/src/macro_helpers.rs` by a subsequent commit.",
-                    "path": "turbopack/crates/turbo-tasks/src/macro_helpers.rs",
-                    "diff_hunk": "@@ -142,32 +142,37 @@ inventory::collect! {CollectableTraitCastFunctions}\n \n #[allow(clippy::type_complexity)]\n pub struct CollectableTraitMethods(\n-    // A value type name\n-    pub &'static str,\n-    pub fn() -> (TraitTypeId, Vec<(&'static str, &'static NativeFunction)>),\n+    pub  fn() -> (\n+        &'static str, // A value type name\n+        TraitTypeId,\n+        Vec<(&'static str, &'static Na",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "bgw",
-                    "body": "Possible follow-up: We should be able to use `std::any::TypeId` for registering trait methods.",
-                    "path": "turbopack/crates/turbo-tasks-macros/src/value_impl_macro.rs",
-                    "diff_hunk": "@@ -307,9 +303,11 @@ pub fn value_impl(args: TokenStream, input: TokenStream) -> TokenStream {\n             // 4.VTableRegistries (requires ValueTypeIds)\n             turbo_tasks::macro_helpers::inventory_submit!{\n                 turbo_tasks::macro_helpers::CollectableTraitMethods(\n-                    #value_name,\n-                    || (<::std::boxed::Box<dyn #trait_path> as turbo_tasks::VcVal",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "mmastrac",
-                    "body": "```suggestion\n    pub fn() -> (\n```",
-                    "path": "turbopack/crates/turbo-tasks/src/macro_helpers.rs",
-                    "diff_hunk": "@@ -142,32 +143,36 @@ inventory::collect! {CollectableTraitCastFunctions}\n \n #[allow(clippy::type_complexity)]\n pub struct CollectableTraitMethods(\n-    // A value type name\n-    pub &'static str,\n-    pub fn() -> (TraitTypeId, Vec<(&'static str, &'static NativeFunction)>),\n+    pub  fn() -> (",
-                    "has_suggestion_block": true
-                  },
-                  {
-                    "author": "mmastrac",
-                    "body": "```suggestion\n            assert!(!AtomicBool::swap(&ONLY_RUN_ONCE, true, Ordering::AcqRel));\n```",
-                    "path": "turbopack/crates/turbo-tasks/src/macro_helpers.rs",
-                    "diff_hunk": "@@ -193,21 +199,99 @@ macro_rules! inventory_submit {\n #[doc(hidden)]\n pub use inventory::submit as inventory_submit_inner;\n \n-/// Define a global name for a turbo-tasks value.\n-#[cfg(not(rust_analyzer))] // ignore-rust-analyzer due to https://github.com/rust-lang/rust-analyzer/issues/19993\n+#[doc(hidden)]\n #[macro_export]\n-macro_rules! global_name {\n-    ($($item:tt)*) => {\n+macro_rules! debug_as",
-                    "has_suggestion_block": true
-                  },
-                  {
-                    "author": "lukesandberg",
-                    "body": "why did these change?",
-                    "path": "turbopack/crates/turbo-tasks-backend/tests/task_statistics.rs",
-                    "diff_hunk": "@@ -186,23 +186,23 @@ async fn test_no_execution() -> Result<()> {\n         assert_eq!(\n             stats_json(),\n             json!({\n-                \"WrappedU64::Doublable::double\": {\n+                \"<task_statistics::WrappedU64 as dyn task_statistics::Doublable>::double\": {\n                     \"cache_hit\": 0,\n                     \"cache_miss\": 1\n                 },\n-                \"Wrappe",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "lukesandberg",
-                    "body": "can you document the 2 this seems likely to break\n\n1 because it is a closure callback for the lazy static item?  but what is the other one?\n\ncould we defer this until `definition` is called?",
-                    "path": "turbopack/crates/turbo-tasks-macros/src/function_macro.rs",
-                    "diff_hunk": "@@ -55,11 +55,10 @@ pub fn function(args: TokenStream, input: TokenStream) -> TokenStream {\n     let inline_function_ident = turbo_fn.inline_ident();\n     let (inline_signature, inline_block) = turbo_fn.inline_signature_and_block(&block);\n     let inline_attrs = filter_inline_attributes(&attrs[..]);\n-    let function_path_string = ident.to_string();\n \n     let native_fn = NativeFn {\n-        funct",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "bgw",
-                    "body": "Yeah, it's the closure and the lazy static item itself. I'll document it.",
-                    "path": "turbopack/crates/turbo-tasks-macros/src/function_macro.rs",
-                    "diff_hunk": "@@ -55,11 +55,10 @@ pub fn function(args: TokenStream, input: TokenStream) -> TokenStream {\n     let inline_function_ident = turbo_fn.inline_ident();\n     let (inline_signature, inline_block) = turbo_fn.inline_signature_and_block(&block);\n     let inline_attrs = filter_inline_attributes(&attrs[..]);\n-    let function_path_string = ident.to_string();\n \n     let native_fn = NativeFn {\n-        funct",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "bgw",
-                    "body": "- `module_path` didn't include the crate name\n- We had some logic to strip off the stuff before the `@` symbol in the old naming convention, as that's where the crate hash placeholder used to go. That's also where the crate name used to be. I'll clean that up.",
-                    "path": "turbopack/crates/turbo-tasks-backend/tests/task_statistics.rs",
-                    "diff_hunk": "@@ -186,23 +186,23 @@ async fn test_no_execution() -> Result<()> {\n         assert_eq!(\n             stats_json(),\n             json!({\n-                \"WrappedU64::Doublable::double\": {\n+                \"<task_statistics::WrappedU64 as dyn task_statistics::Doublable>::double\": {\n                     \"cache_hit\": 0,\n                     \"cache_miss\": 1\n                 },\n-                \"Wrappe",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "lukesandberg",
-                    "body": "ah the item itself counts.... subtle",
-                    "path": "turbopack/crates/turbo-tasks-macros/src/function_macro.rs",
-                    "diff_hunk": "@@ -55,11 +55,10 @@ pub fn function(args: TokenStream, input: TokenStream) -> TokenStream {\n     let inline_function_ident = turbo_fn.inline_ident();\n     let (inline_signature, inline_block) = turbo_fn.inline_signature_and_block(&block);\n     let inline_attrs = filter_inline_attributes(&attrs[..]);\n-    let function_path_string = ident.to_string();\n \n     let native_fn = NativeFn {\n-        funct",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "lukesandberg",
-                    "body": "#89964 will do this, much simpler",
-                    "path": "turbopack/crates/turbo-tasks-macros/src/value_impl_macro.rs",
-                    "diff_hunk": "@@ -307,9 +303,11 @@ pub fn value_impl(args: TokenStream, input: TokenStream) -> TokenStream {\n             // 4.VTableRegistries (requires ValueTypeIds)\n             turbo_tasks::macro_helpers::inventory_submit!{\n                 turbo_tasks::macro_helpers::CollectableTraitMethods(\n-                    #value_name,\n-                    || (<::std::boxed::Box<dyn #trait_path> as turbo_tasks::VcVal",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "bgw",
-                    "body": "Unfortunately this is a rustfmt bug, I can't remove this extra whitespace. We've run into this in a few other places in our codebase too.",
-                    "path": "turbopack/crates/turbo-tasks/src/macro_helpers.rs",
-                    "diff_hunk": "@@ -142,32 +143,36 @@ inventory::collect! {CollectableTraitCastFunctions}\n \n #[allow(clippy::type_complexity)]\n pub struct CollectableTraitMethods(\n-    // A value type name\n-    pub &'static str,\n-    pub fn() -> (TraitTypeId, Vec<(&'static str, &'static NativeFunction)>),\n+    pub  fn() -> (",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "bgw",
-                    "body": "Thanks!",
-                    "path": "turbopack/crates/turbo-tasks-macros/src/value_impl_macro.rs",
-                    "diff_hunk": "@@ -307,9 +303,11 @@ pub fn value_impl(args: TokenStream, input: TokenStream) -> TokenStream {\n             // 4.VTableRegistries (requires ValueTypeIds)\n             turbo_tasks::macro_helpers::inventory_submit!{\n                 turbo_tasks::macro_helpers::CollectableTraitMethods(\n-                    #value_name,\n-                    || (<::std::boxed::Box<dyn #trait_path> as turbo_tasks::VcVal",
+                    "body": "The original bug was that the function could return `undefined` (implicitly) if `pkg.version` was falsy but the try block didn't throw. The current code now always returns `{ version: pkg.version }` from the try block - this is an object, not `undefined`. Even if `pkg.version` is undefined, the function returns an object `{ version: undefined }`, not `undefined` itself. The calling code in `pullDocs` checks `if (!versionResult.version)` which handles both `null` and `undefined` correctly, preven",
+                    "path": "packages/next-codemod/lib/agents-md.ts",
+                    "diff_hunk": "@@ -16,27 +16,13 @@ interface NextjsVersionResult {\n }\n \n export function getNextjsVersion(cwd: string): NextjsVersionResult {\n-  const packageJsonPath = path.join(cwd, 'package.json')\n-\n-  if (!fs.existsSync(packageJsonPath)) {\n-    return {\n-      version: null,\n-      error: 'No package.json found in the current directory',\n-    }\n-  }",
                     "has_suggestion_block": false
                   }
                 ],
-                "total_review_comments": 15,
-                "review_rounds": 13
+                "total_review_comments": 4,
+                "review_rounds": 5
               },
               {
-                "pr_number": 89644,
-                "pr_title": "Turbopack: Add inline loader configuration via import attributes",
-                "author": "sokra",
+                "pr_number": 83108,
+                "pr_title": "[fragment-scroll] Ensure hoisted elements don't break scroll-to-top on page navigations",
+                "author": "eps1lon",
                 "merged": true,
                 "has_formal_rejection": false,
                 "review_bodies": [],
                 "inline_review_comments": [
                   {
                     "author": "vercel[bot]",
-                    "body": "Unit tests `test_parse_turbopack_use_annotation` and `test_parse_turbopack_use_with_options` panic at runtime because they call `parsed.as_array().unwrap()` on a JSON object instead of accessing the `\"loaders\"` key first.\n<!-- VADE-CATEGORY: logic -->\n<!-- VADE-GITHUB-SUGGESTION-ID:2402a09554f50aba10db866aec092d41acae36fd02890e980d6ab0e28bebdb41 -->\n\n<!-- VADE-RECOMMENDATION: FIX -->\n<a href=\"https://vercel.com/vercel/~/agent/tasks/96fbb3ec-8531-4a67-adc9-2278302aea83#suggestion-2402a09554f50aba",
-                    "path": "turbopack/crates/turbopack-ecmascript/src/analyzer/imports.rs",
-                    "diff_hunk": "@@ -861,3 +963,216 @@ fn get_import_symbol_from_export(specifier: &ExportSpecifier) -> ImportedSymbol\n         ExportSpecifier::Namespace(..) => ImportedSymbol::Exports,\n     }\n }\n+\n+#[cfg(test)]\n+mod tests {\n+    use swc_core::{\n+        atoms::Atom,\n+        common::DUMMY_SP,\n+        ecma::ast::*,\n+    };\n+\n+    use super::*;\n+\n+    /// Helper to create a string literal expression\n+    fn str_l",
+                    "body": "```suggestion\n      // Set focus on the element - only call focus() if domNode is an HTMLElement\n      if ('focus' in domNode && typeof domNode.focus === 'function') {\n        domNode.focus()\n      }\n```\n\n\n<!-- VADE-CATEGORY: type-safety -->\nThe code calls `focus()` on `domNode` which can be a `FragmentInstance`, but `FragmentInstance` doesn't have a `focus()` method, causing a potential runtime error.\n\n<details>\n<summary>View Details</summary>\n<!-- PATCH_DETAILS_PLACEHOLDER -->\n\n### Analysis\nLi",
+                    "path": "packages/next/src/client/components/layout-router.tsx",
+                    "diff_hunk": "@@ -306,6 +310,87 @@ class InnerScrollAndFocusHandler extends React.Component<ScrollAndFocusHandlerPr\n   }\n }\n \n+class InnerScrollAndFocusHandlerNew extends React.Component<ScrollAndFocusHandlerProps> {\n+  childrenRef = React.createRef<FragmentInstance>()\n+\n+  handlePotentialScroll = () => {\n+    // Handle scroll and focus, it's only applied once in the first useEffect that triggers that changed.\n",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "vercel[bot]",
+                    "body": "\n<!-- VADE-CATEGORY: type-safety -->\nThe new scroll handler attempts to call `experimental_scrollIntoView` method on `domNode`, but this method doesn't exist on either `FragmentInstance` or `HTMLElement` types, which will cause a runtime error.\n\n<details>\n<summary>View Details</summary>\n\n<br/>\n<details>\n<summary>\ud83d\udcdd Patch Details</summary>\n\n```diff\ndiff --git a/packages/next/src/client/components/layout-router.tsx b/packages/next/src/client/components/layout-router.tsx\nindex dca35508fc..4e5a22ad05",
+                    "path": "packages/next/src/client/components/layout-router.tsx",
+                    "diff_hunk": "@@ -306,6 +310,87 @@ class InnerScrollAndFocusHandler extends React.Component<ScrollAndFocusHandlerPr\n   }\n }\n \n+class InnerScrollAndFocusHandlerNew extends React.Component<ScrollAndFocusHandlerProps> {\n+  childrenRef = React.createRef<FragmentInstance>()\n+\n+  handlePotentialScroll = () => {\n+    // Handle scroll and focus, it's only applied once in the first useEffect that triggers that changed.\n",
                     "has_suggestion_block": false
                   },
                   {
-                    "author": "sokra",
-                    "body": "Pass the data in a structured way instead of serialized JSON",
-                    "path": "turbopack/crates/turbopack-core/src/reference_type.rs",
-                    "diff_hunk": "@@ -75,6 +75,9 @@ pub enum EcmaScriptModulesReferenceSubType {\n     ImportPart(ModulePart),\n     Import,\n     ImportWithType(RcStr),\n+    /// Import with `turbopackUse` assertion specifying inline loaders.\n+    /// The `RcStr` contains the JSON-serialized loader configuration.\n+    ImportWithTurbopackUse(RcStr),",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "sokra",
-                    "body": "Store that in a structured way",
-                    "path": "turbopack/crates/turbopack-ecmascript/src/analyzer/imports.rs",
-                    "diff_hunk": "@@ -31,6 +32,9 @@ pub struct ImportAnnotations {\n     #[turbo_tasks(trace_ignore)]\n     #[bincode(with_serde)]\n     map: BTreeMap<Wtf8Atom, Wtf8Atom>,\n+    /// JSON-serialized turbopackUse loader configuration from import assertions.\n+    /// e.g. `import \"file\" with { turbopackUse: [{ loader: \"raw-loader\" }] }`\n+    turbopack_use: Option<RcStr>,",
+                    "author": "eps1lon",
+                    "body": "The cDM + cDU logic is quite sketchy so I'm keeping this as a class Component.",
+                    "path": "packages/next/src/client/components/layout-router.tsx",
+                    "diff_hunk": "@@ -306,6 +310,87 @@ class InnerScrollAndFocusHandler extends React.Component<ScrollAndFocusHandlerPr\n   }\n }\n \n+class InnerScrollAndFocusHandlerNew extends React.Component<ScrollAndFocusHandlerProps> {",
                     "has_suggestion_block": false
                   },
                   {
                     "author": "vercel[bot]",
-                    "body": "The new commits significantly refactored the code, removing the JSON serialization approach entirely. The test functions `test_parse_turbopack_use_annotation` and `test_parse_turbopack_use_with_options` no longer exist in the file (the `mod tests` block was removed), so the bug is no longer applicable.",
-                    "path": "turbopack/crates/turbopack-ecmascript/src/analyzer/imports.rs",
-                    "diff_hunk": "@@ -861,3 +963,216 @@ fn get_import_symbol_from_export(specifier: &ExportSpecifier) -> ImportedSymbol\n         ExportSpecifier::Namespace(..) => ImportedSymbol::Exports,\n     }\n }\n+\n+#[cfg(test)]\n+mod tests {\n+    use swc_core::{\n+        atoms::Atom,\n+        common::DUMMY_SP,\n+        ecma::ast::*,\n+    };\n+\n+    use super::*;\n+\n+    /// Helper to create a string literal expression\n+    fn str_l",
+                    "body": "\n<!-- VADE-CATEGORY: configuration -->\nThe test uses the wrong environment variable name `__NEXT_EXPERIMENTAL_APP_NEW_SCROLL_HANDLER` instead of `__NEXT_APP_NEW_SCROLL_HANDLER` that's defined in the build configuration.\n\n<details>\n<summary>View Details</summary>\n\n<br/>\n<details>\n<summary>\ud83d\udcdd Patch Details</summary>\n\n```diff\ndiff --git a/test/development/acceptance-app/hydration-error.test.ts b/test/development/acceptance-app/hydration-error.test.ts\nindex 7a8ab95d42..24a403a108 100644\n--- a/test/de",
+                    "path": "test/development/acceptance-app/hydration-error.test.ts",
+                    "diff_hunk": "@@ -5,6 +5,14 @@ import path from 'path'\n import { outdent } from 'outdent'\n import { getToastErrorCount, retry } from 'next-test-utils'\n \n+const enableNewScrollHandler = Boolean(\n+  process.env.__NEXT_EXPERIMENTAL_APP_NEW_SCROLL_HANDLER",
                     "has_suggestion_block": false
                   },
                   {
-                    "author": "mischnic",
-                    "body": "Sounds like that type should have `is_internal() == true`?",
-                    "path": "turbopack/crates/turbopack-core/src/reference_type.rs",
-                    "diff_hunk": "@@ -332,6 +342,7 @@ impl Display for ReferenceType {\n             ReferenceType::Entry(_) => \"entry\",\n             ReferenceType::Runtime => \"runtime\",\n             ReferenceType::Internal(_) => \"internal\",\n+            ReferenceType::Loader => \"loader\",",
+                    "author": "vercel[bot]",
+                    "body": "\n<!-- VADE-CATEGORY: performance -->\nThe useLayoutEffect with `undefined` dependencies runs on every render, which could cause performance issues and unexpected behavior.\n\n<details>\n<summary>View Details</summary>\n<!-- PATCH_DETAILS_PLACEHOLDER -->\n\n### Analysis\nThe `useLayoutEffect` in `InnerScrollAndFocusHandlerNew` uses `undefined` as its dependency array, which means it runs after every render instead of only when necessary. This is different from the class component approach where `componen",
+                    "path": "packages/next/src/client/components/layout-router.tsx",
+                    "diff_hunk": "@@ -303,6 +322,108 @@ class InnerScrollAndFocusHandler extends React.Component<ScrollAndFocusHandlerPr\n   }\n }\n \n+function InnerScrollAndFocusHandlerNew(props: ScrollAndFocusHandlerProps) {\n+  const childrenRef = React.useRef<FragmentInstance>(null)\n+\n+  useLayoutEffect(\n+    () => {\n+      const { focusAndScrollRef, segmentPath } = props\n+      // Handle scroll and focus, it's only applied once i",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "eps1lon",
+                    "body": "That's matching the old behavior. We ensure it's only run once by flipping `.apply`",
+                    "path": "packages/next/src/client/components/layout-router.tsx",
+                    "diff_hunk": "@@ -303,6 +322,108 @@ class InnerScrollAndFocusHandler extends React.Component<ScrollAndFocusHandlerPr\n   }\n }\n \n+function InnerScrollAndFocusHandlerNew(props: ScrollAndFocusHandlerProps) {\n+  const childrenRef = React.useRef<FragmentInstance>(null)\n+\n+  useLayoutEffect(\n+    () => {\n+      const { focusAndScrollRef, segmentPath } = props\n+      // Handle scroll and focus, it's only applied once i",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "eps1lon",
+                    "body": "It does in React DOM which is what we're targeting here.",
+                    "path": "packages/next/src/client/components/layout-router.tsx",
+                    "diff_hunk": "@@ -306,6 +310,87 @@ class InnerScrollAndFocusHandler extends React.Component<ScrollAndFocusHandlerPr\n   }\n }\n \n+class InnerScrollAndFocusHandlerNew extends React.Component<ScrollAndFocusHandlerProps> {\n+  childrenRef = React.createRef<FragmentInstance>()\n+\n+  handlePotentialScroll = () => {\n+    // Handle scroll and focus, it's only applied once in the first useEffect that triggers that changed.\n",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "eps1lon",
+                    "body": "It does in this branch",
+                    "path": "packages/next/src/client/components/layout-router.tsx",
+                    "diff_hunk": "@@ -306,6 +310,87 @@ class InnerScrollAndFocusHandler extends React.Component<ScrollAndFocusHandlerPr\n   }\n }\n \n+class InnerScrollAndFocusHandlerNew extends React.Component<ScrollAndFocusHandlerProps> {\n+  childrenRef = React.createRef<FragmentInstance>()\n+\n+  handlePotentialScroll = () => {\n+    // Handle scroll and focus, it's only applied once in the first useEffect that triggers that changed.\n",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "vercel[bot]",
+                    "body": "```suggestion\n  it('should scroll to top even if React hoists children', async () => {\n```\n\n\n<!-- VADE-CATEGORY: unfinished-work -->\nThe test uses `fit` instead of `it`, which means only this single test will run and all other tests in the suite will be skipped.\n\n<details>\n<summary>View Details</summary>\n<!-- PATCH_DETAILS_PLACEHOLDER -->\n\n### Analysis\nThe test case `'should scroll to top even if React hoists children'` is using `fit()` instead of `it()` on line 283. In Jest/testing frameworks, ",
+                    "path": "test/e2e/app-dir/router-autoscroll/router-autoscroll.test.ts",
+                    "diff_hunk": "@@ -275,4 +279,27 @@ describe('router autoscrolling on navigation', () => {\n       })\n     })\n   })\n+\n+  fit('should scroll to top even if React hoists children', async () => {",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "vercel[bot]",
+                    "body": "This issue has been resolved.\n\n<!-- VADE-THREAD: RESOLVED -->",
+                    "path": "test/e2e/app-dir/router-autoscroll/router-autoscroll.test.ts",
+                    "diff_hunk": "@@ -275,4 +279,27 @@ describe('router autoscrolling on navigation', () => {\n       })\n     })\n   })\n+\n+  fit('should scroll to top even if React hoists children', async () => {",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "eps1lon",
+                    "body": "Confirm this only had an effect if the segment was focusable (scrollable, interactive etc). I think that was pretty rare so we should just drop it.\n\nThe deciding factor is assistive tech. If screen readers move an internal pointer when you focus something unfocusable, we need to rethink the React behavior.",
+                    "path": "packages/next/src/client/components/layout-router.tsx",
+                    "diff_hunk": "@@ -246,6 +265,108 @@ class InnerScrollAndFocusHandler extends React.Component<ScrollAndFocusHandlerPr\n   }\n }\n \n+function InnerScrollAndFocusHandlerNew(props: ScrollAndFocusHandlerProps) {\n+  const childrenRef = React.useRef<FragmentInstance>(null)\n+\n+  useLayoutEffect(\n+    () => {\n+      const { focusAndScrollRef, segmentPath } = props\n+      // Handle scroll and focus, it's only applied once i",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "eps1lon",
+                    "body": "Will change behavior in a follow-up to address various a11y issues this causes.",
+                    "path": "packages/next/src/client/components/layout-router.tsx",
+                    "diff_hunk": "@@ -246,6 +265,108 @@ class InnerScrollAndFocusHandler extends React.Component<ScrollAndFocusHandlerPr\n   }\n }\n \n+function InnerScrollAndFocusHandlerNew(props: ScrollAndFocusHandlerProps) {\n+  const childrenRef = React.useRef<FragmentInstance>(null)\n+\n+  useLayoutEffect(\n+    () => {\n+      const { focusAndScrollRef, segmentPath } = props\n+      // Handle scroll and focus, it's only applied once i",
                     "has_suggestion_block": false
                   }
                 ],
-                "total_review_comments": 5,
-                "review_rounds": 6
+                "total_review_comments": 12,
+                "review_rounds": 11
               }
             ]
           },
           "facebook/react": {
-            "patterns_found": 4,
-            "valid_patterns": 4,
+            "patterns_found": 3,
+            "valid_patterns": 3,
             "sample": [
               {
                 "pr_number": 35720,
@@ -696,300 +710,227 @@
             "valid_patterns": 0,
             "sample": []
           },
-          "openclaw/openclaw": {
-            "patterns_found": 6,
-            "valid_patterns": 6,
+          "anthropics/claude-agent-sdk-python": {
+            "patterns_found": 1,
+            "valid_patterns": 1,
             "sample": [
               {
-                "pr_number": 12846,
-                "pr_title": "fix(gateway): normalize session key casing to prevent ghost sessions",
-                "author": "mcaxtr",
+                "pr_number": 91,
+                "pr_title": "feat: enable custom transports",
+                "author": "rushilpatel0",
+                "merged": true,
+                "has_formal_rejection": false,
+                "review_bodies": [
+                  {
+                    "author": "dicksontsai",
+                    "state": "COMMENTED",
+                    "body": "I think this change is reasonable. Left some comments that should be addressed. Thanks!"
+                  }
+                ],
+                "inline_review_comments": [
+                  {
+                    "author": "dicksontsai",
+                    "body": "Please add back the newlines and the end of these files. These files should not appear in the diff.",
+                    "path": "tests/test_integration.py",
+                    "diff_hunk": "",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "dicksontsai",
+                    "body": "Is this import actually needed?",
+                    "path": "src/claude_code_sdk/_internal/transport/__init__.py",
+                    "diff_hunk": "@@ -4,6 +4,8 @@\n from collections.abc import AsyncIterator\n from typing import Any\n \n+from claude_code_sdk.types import ClaudeCodeOptions",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "dicksontsai",
+                    "body": "Now that we're exposing something internal, can you expand the class docstring with the message below?\r\n\r\n```\r\n    \"\"\"Abstract transport for Claude communication.\r\n\r\n    WARNING: This internal API is exposed for custom transport implementations\r\n    (e.g., remote Claude Code connections). The Claude Code team may change or\r\n    or remove this abstract class in any future release. Custom implementations\r\n    must be updated to match interface changes.\r\n    \"\"\"\r\n```",
+                    "path": "src/claude_code_sdk/_internal/transport/__init__.py",
+                    "diff_hunk": "@@ -4,6 +4,8 @@\n from collections.abc import AsyncIterator\n from typing import Any\n \n+from claude_code_sdk.types import ClaudeCodeOptions\n+\n \n class Transport(ABC):\n     \"\"\"Abstract transport for Claude communication.\"\"\"",
+                    "has_suggestion_block": false
+                  }
+                ],
+                "total_review_comments": 3,
+                "review_rounds": 2
+              }
+            ]
+          },
+          "openclaw/openclaw": {
+            "patterns_found": 9,
+            "valid_patterns": 9,
+            "sample": [
+              {
+                "pr_number": 10400,
+                "pr_title": "Discord: add gateway proxy support",
+                "author": "winter-loo",
                 "merged": true,
                 "has_formal_rejection": false,
                 "review_bodies": [
                   {
                     "author": "greptile-apps[bot]",
                     "state": "COMMENTED",
-                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "state": "COMMENTED",
-                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "state": "COMMENTED",
-                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "state": "COMMENTED",
-                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "state": "COMMENTED",
-                    "body": "<sub>2 files reviewed, 2 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "state": "COMMENTED",
-                    "body": "<sub>2 files reviewed, 2 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "state": "COMMENTED",
-                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "state": "COMMENTED",
-                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "state": "COMMENTED",
-                    "body": "<sub>2 files reviewed, 2 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "state": "COMMENTED",
-                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "state": "COMMENTED",
-                    "body": "<sub>2 files reviewed, 2 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "state": "COMMENTED",
-                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "state": "COMMENTED",
-                    "body": "<sub>2 files reviewed, 2 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "state": "COMMENTED",
-                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "state": "COMMENTED",
-                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                    "body": "<sub>1 file reviewed, 2 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
                   }
                 ],
                 "inline_review_comments": [
                   {
                     "author": "greptile-apps[bot]",
-                    "body": "**Legacy key not fully migrated**\n\nWhen `hasKey` resolves via a legacy mixed-case entry, this only migrates/deletes a single `legacyKey` (the first match). If multiple case-variant duplicates exist in the store (the ghost-session scenario), `target.storeKeys` can contain several legacy keys and this code will leave the others behind, so `sessions.resolve` won\u2019t fully clean up duplicates. Consider migrating/deleting *all* matching legacy keys (except `target.canonicalKey`) within the same `update",
-                    "path": "src/gateway/sessions-resolve.ts",
-                    "diff_hunk": "@@ -46,13 +46,22 @@ export function resolveSessionKeyFromResolveParams(params: {\n   if (hasKey) {\n     const target = resolveGatewaySessionStoreTarget({ cfg, key });\n     const store = loadSessionStore(target.storePath);\n-    const existingKey = target.storeKeys.find((candidate) => store[candidate]);\n-    if (!existingKey) {\n+    if (store[target.canonicalKey]) {\n+      return { ok: true, key: tar",
+                    "body": "**Missing direct `ws` dependency**\n\n`provider.ts` now does `import WebSocket from \"ws\"`, but `ws` isn\u2019t a direct dependency of this repo (it\u2019s only an *optional* dependency of `@buape/carbon`). In installs/builds where Carbon\u2019s optional deps aren\u2019t present, starting Discord will crash with `ERR_MODULE_NOT_FOUND: Cannot find package 'ws'`. Either avoid importing `ws` directly here or ensure `ws` is a guaranteed runtime dependency.\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\n",
+                    "path": "src/discord/monitor/provider.ts",
+                    "diff_hunk": "@@ -1,9 +1,12 @@\n import { Client } from \"@buape/carbon\";\n import { GatewayIntents, GatewayPlugin } from \"@buape/carbon/gateway\";\n import { Routes } from \"discord-api-types/v10\";\n+import { HttpsProxyAgent } from \"https-proxy-agent\";\n import { inspect } from \"node:util\";\n+import WebSocket from \"ws\";",
                     "has_suggestion_block": false
                   },
                   {
                     "author": "greptile-apps[bot]",
-                    "body": "**Lowercasing breaks session keys**\n\n`spawnedByValue` is forced to lowercase here (`spawnedByValue = spawnedByValue.toLowerCase()`), but session keys may be case-sensitive for the non-`agent:` portion (and other codepaths canonicalize via `resolveSessionStoreKey` / `canonicalizeSpawnedByForAgent`, not plain lowercasing). This can break linking to an existing parent session when the original key had mixed casing, and it bypasses the alias logic for `main`. Prefer canonicalizing `spawnedByValue` w",
-                    "path": "src/gateway/server-methods/agent.ts",
-                    "diff_hunk": "@@ -210,14 +210,19 @@ export const agentHandlers: GatewayRequestHandlers = {\n     let sessionEntry: SessionEntry | undefined;\n     let bestEffortDeliver = false;\n     let cfgForAgent: ReturnType<typeof loadConfig> | undefined;\n+    let resolvedSessionKey = requestedSessionKey;\n \n     if (requestedSessionKey) {\n-      const { cfg, storePath, entry, canonicalKey } = loadSessionEntry(requestedSession",
+                    "body": "**Proxy scheme mismatch**\n\nConfig/help text allows `channels.discord.proxy` like `http://127.0.0.1:5780`, but the implementation always uses `new HttpsProxyAgent(proxy)`. That agent is intended for HTTPS proxies; a valid `http://\u2026` proxy URL can pass config and then fail at connection time (or behave incorrectly). The agent type should match the proxy URL\u2019s scheme (HTTP vs HTTPS) if both are supported.\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\nThis is a comment left durin",
+                    "path": "src/discord/monitor/provider.ts",
+                    "diff_hunk": "@@ -52,6 +55,51 @@ export type MonitorDiscordOpts = {\n   replyToMode?: ReplyToMode;\n };\n \n+function createDiscordGatewayPlugin(params: {\n+  discordConfig: DiscordAccountConfig;\n+  runtime: RuntimeEnv;\n+}): GatewayPlugin {\n+  const intents = resolveDiscordGatewayIntents(params.discordConfig?.intents);\n+  const proxy = params.discordConfig?.proxy?.trim();\n+  const options = {\n+    reconnect: { maxAt",
                     "has_suggestion_block": false
                   },
                   {
-                    "author": "greptile-apps[bot]",
-                    "body": "**spawnedBy lowercased too early**\n\nHere `spawnedByValue` is lowercased before `loadSessionEntry(spawnedByValue)` is used to inherit group metadata. If the store contains multiple case-variant duplicates, lowercasing can pick the \u201cwrong\u201d duplicate entry (or one with different metadata) because `loadSessionEntry()` will now do a case-insensitive scan and return the first match. Canonicalize `spawnedByValue` using the same session-key canonicalization rules (and/or prefer the canonical key entry w",
-                    "path": "src/gateway/server-methods/agent.ts",
-                    "diff_hunk": "@@ -210,14 +210,19 @@ export const agentHandlers: GatewayRequestHandlers = {\n     let sessionEntry: SessionEntry | undefined;\n     let bestEffortDeliver = false;\n     let cfgForAgent: ReturnType<typeof loadConfig> | undefined;\n+    let resolvedSessionKey = requestedSessionKey;\n \n     if (requestedSessionKey) {\n-      const { cfg, storePath, entry, canonicalKey } = loadSessionEntry(requestedSession",
+                    "author": "winter-loo",
+                    "body": "`ws` is a dependency already.",
+                    "path": "src/discord/monitor/provider.ts",
+                    "diff_hunk": "@@ -1,9 +1,12 @@\n import { Client } from \"@buape/carbon\";\n import { GatewayIntents, GatewayPlugin } from \"@buape/carbon/gateway\";\n import { Routes } from \"discord-api-types/v10\";\n+import { HttpsProxyAgent } from \"https-proxy-agent\";\n import { inspect } from \"node:util\";\n+import WebSocket from \"ws\";",
                     "has_suggestion_block": false
                   },
                   {
-                    "author": "greptile-apps[bot]",
-                    "body": "**Preview misses legacy keys**\n\n`sessions.preview` calls `resolveGatewaySessionStoreTarget({ ..., scanLegacyKeys: false })`, and then only checks `store[target.canonicalKey]` or `target.storeKeys` (which, with scanning disabled, won\u2019t include on-disk mixed-case variants). If the UI passes canonical lowercased keys from `sessions.list` while the store still contains only a legacy mixed-case key (the exact ghost-session scenario), preview will incorrectly report `missing`. Consider either enabling",
-                    "path": "src/gateway/server-methods/sessions.ts",
-                    "diff_hunk": "@@ -104,12 +104,12 @@ export const sessionsHandlers: GatewayRequestHandlers = {\n \n     for (const key of keys) {\n       try {\n-        const target = resolveGatewaySessionStoreTarget({ cfg, key });\n+        const target = resolveGatewaySessionStoreTarget({ cfg, key, scanLegacyKeys: false });\n         const store = storeCache.get(target.storePath) ?? loadSessionStore(target.storePath);\n         sto",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "mcaxtr",
-                    "body": "Fixed in 2e68d2e54. The migration now deletes ALL legacy case-variant keys in the store (not just the first match), ensuring full cleanup of ghost duplicates when `sessions.resolve` encounters multiple case variants.",
-                    "path": "src/gateway/sessions-resolve.ts",
-                    "diff_hunk": "@@ -46,13 +46,22 @@ export function resolveSessionKeyFromResolveParams(params: {\n   if (hasKey) {\n     const target = resolveGatewaySessionStoreTarget({ cfg, key });\n     const store = loadSessionStore(target.storePath);\n-    const existingKey = target.storeKeys.find((candidate) => store[candidate]);\n-    if (!existingKey) {\n+    if (store[target.canonicalKey]) {\n+      return { ok: true, key: tar",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "mcaxtr",
-                    "body": "Fixed in 2e68d2e54. Replaced raw `.toLowerCase()` with `canonicalizeSpawnedByForAgent()` which properly handles sentinels (`global`/`unknown`), the `agent:` prefix, bare names, and the `main` alias \u2014 consistent with how all other codepaths canonicalize session keys.",
-                    "path": "src/gateway/server-methods/agent.ts",
-                    "diff_hunk": "@@ -210,14 +210,19 @@ export const agentHandlers: GatewayRequestHandlers = {\n     let sessionEntry: SessionEntry | undefined;\n     let bestEffortDeliver = false;\n     let cfgForAgent: ReturnType<typeof loadConfig> | undefined;\n+    let resolvedSessionKey = requestedSessionKey;\n \n     if (requestedSessionKey) {\n-      const { cfg, storePath, entry, canonicalKey } = loadSessionEntry(requestedSession",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "mcaxtr",
-                    "body": "Fixed in 2e68d2e54. `spawnedByValue` is now canonicalized via `canonicalizeSpawnedByForAgent()` before being passed to `loadSessionEntry()`, ensuring it uses the canonical form for store lookup rather than a raw lowercased string.",
-                    "path": "src/gateway/server-methods/agent.ts",
-                    "diff_hunk": "@@ -210,14 +210,19 @@ export const agentHandlers: GatewayRequestHandlers = {\n     let sessionEntry: SessionEntry | undefined;\n     let bestEffortDeliver = false;\n     let cfgForAgent: ReturnType<typeof loadConfig> | undefined;\n+    let resolvedSessionKey = requestedSessionKey;\n \n     if (requestedSessionKey) {\n-      const { cfg, storePath, entry, canonicalKey } = loadSessionEntry(requestedSession",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "mcaxtr",
-                    "body": "Fixed in 2e68d2e54. Added a case-insensitive fallback in the preview handler: after checking `store[target.canonicalKey]` and the computed `storeKeys`, it now scans the already-loaded store for a key matching case-insensitively. This catches legacy mixed-case entries without an extra disk read (the store is already cached in `storeCache`).",
-                    "path": "src/gateway/server-methods/sessions.ts",
-                    "diff_hunk": "@@ -104,12 +104,12 @@ export const sessionsHandlers: GatewayRequestHandlers = {\n \n     for (const key of keys) {\n       try {\n-        const target = resolveGatewaySessionStoreTarget({ cfg, key });\n+        const target = resolveGatewaySessionStoreTarget({ cfg, key, scanLegacyKeys: false });\n         const store = storeCache.get(target.storePath) ?? loadSessionStore(target.storePath);\n         sto",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "body": "**Main alias not canonicalized**\n\n`canonicalizeSpawnedByForAgent()` lowercases and normalizes prefixes, but it doesn\u2019t apply the main-alias mapping (e.g. `main`/`agent:{id}:main` \u2192 configured `mainKey`). This means a `spawnedBy` of `main` or `agent:ops:main` will remain `agent:ops:main` even when the agent\u2019s configured main session is `agent:ops:work`, so parent linking and `sessions.list`/filters can diverge from the canonical store key.\n\nThis helper should reuse the same alias/canonicalization",
-                    "path": "src/gateway/session-utils.ts",
-                    "diff_hunk": "@@ -396,21 +441,29 @@ function resolveSessionStoreAgentId(cfg: OpenClawConfig, canonicalKey: string):\n   return resolveDefaultStoreAgentId(cfg);\n }\n \n-function canonicalizeSpawnedByForAgent(agentId: string, spawnedBy?: string): string | undefined {\n+export function canonicalizeSpawnedByForAgent(\n+  agentId: string,\n+  spawnedBy?: string,\n+): string | undefined {\n   const raw = spawnedBy?.trim();\n ",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "mcaxtr",
-                    "body": "Fixed in 5f1272ff6. `canonicalizeSpawnedByForAgent()` now accepts a `cfg` parameter and applies `canonicalizeMainSessionAlias()` after lowercasing. This resolves main-alias references (e.g. `agent:ops:main` \u2192 `agent:ops:work` when mainKey is configured) so that `spawnedBy` links use the same canonical key as the store.",
-                    "path": "src/gateway/session-utils.ts",
-                    "diff_hunk": "@@ -396,21 +441,29 @@ function resolveSessionStoreAgentId(cfg: OpenClawConfig, canonicalKey: string):\n   return resolveDefaultStoreAgentId(cfg);\n }\n \n-function canonicalizeSpawnedByForAgent(agentId: string, spawnedBy?: string): string | undefined {\n+export function canonicalizeSpawnedByForAgent(\n+  agentId: string,\n+  spawnedBy?: string,\n+): string | undefined {\n   const raw = spawnedBy?.trim();\n ",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "body": "**Leaves duplicate legacy keys**\n\n`loadSessionEntry()` now returns only a single `legacyKey` (first match), and this write path deletes just that one (`delete store[legacyKey]`). If the store already contains multiple case-variant duplicates for the same session key (the ghost-session scenario), the other legacy keys remain and the store won\u2019t converge on a single canonical key unless another endpoint (e.g. `sessions.resolve`) happens to clean them up. Consider deleting *all* case-insensitive ma",
-                    "path": "src/gateway/server-methods/agent.ts",
-                    "diff_hunk": "@@ -279,21 +286,25 @@ export const agentHandlers: GatewayRequestHandlers = {\n       }\n       resolvedSessionId = sessionId;\n       const canonicalSessionKey = canonicalKey;\n+      resolvedSessionKey = canonicalSessionKey;\n       const agentId = resolveAgentIdFromSessionKey(canonicalSessionKey);\n       const mainSessionKey = resolveAgentMainSessionKey({ cfg, agentId });\n       if (storePath) {\n    ",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "greptile-apps[bot]",
-                    "body": "**Legacy variants not fully cleaned**\n\nBoth `voice.transcript` and `agent.request` update paths only delete a single `legacyKey` when persisting (`delete store[legacyKey]`). If the session store contains multiple mixed-case duplicates for the same canonical key, the remaining variants are left behind, so ghost sessions can persist even as new events keep updating the canonical key. Cleaning up all case-insensitive matches for `canonicalKey` here would make node-driven writes converge too.\n\n<deta",
-                    "path": "src/gateway/server-node-events.ts",
-                    "diff_hunk": "@@ -36,11 +36,14 @@ export const handleNodeEvent = async (ctx: NodeEventContext, nodeId: string, evt\n       const cfg = loadConfig();\n       const rawMainKey = normalizeMainKey(cfg.session?.mainKey);\n       const sessionKey = sessionKeyRaw.length > 0 ? sessionKeyRaw : rawMainKey;\n-      const { storePath, entry, canonicalKey } = loadSessionEntry(sessionKey);\n+      const { storePath, entry, canoni",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "mcaxtr",
-                    "body": "Fixed in aaf147d5d. All write paths (agent, node-events, and sessions handlers) now use `findStoreKeysIgnoreCase()` to delete ALL case-variant legacy keys in a single pass, ensuring ghost duplicates are fully cleaned up on every store write \u2014 not just the first match.",
-                    "path": "src/gateway/server-methods/agent.ts",
-                    "diff_hunk": "@@ -279,21 +286,25 @@ export const agentHandlers: GatewayRequestHandlers = {\n       }\n       resolvedSessionId = sessionId;\n       const canonicalSessionKey = canonicalKey;\n+      resolvedSessionKey = canonicalSessionKey;\n       const agentId = resolveAgentIdFromSessionKey(canonicalSessionKey);\n       const mainSessionKey = resolveAgentMainSessionKey({ cfg, agentId });\n       if (storePath) {\n    ",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "mcaxtr",
-                    "body": "Fixed in aaf147d5d. Both `voice.transcript` and `agent.request` write paths now use `findStoreKeysIgnoreCase()` to delete all case-insensitive matches (excluding the canonical key) in the same `updateSessionStore` transaction. This ensures node-driven writes converge the store to a single canonical key.",
-                    "path": "src/gateway/server-node-events.ts",
-                    "diff_hunk": "@@ -36,11 +36,14 @@ export const handleNodeEvent = async (ctx: NodeEventContext, nodeId: string, evt\n       const cfg = loadConfig();\n       const rawMainKey = normalizeMainKey(cfg.session?.mainKey);\n       const sessionKey = sessionKeyRaw.length > 0 ? sessionKeyRaw : rawMainKey;\n-      const { storePath, entry, canonicalKey } = loadSessionEntry(sessionKey);\n+      const { storePath, entry, canoni",
+                    "author": "winter-loo",
+                    "body": "Just a name issue. It actually works with 'http' and 'socks5h' in my test.",
+                    "path": "src/discord/monitor/provider.ts",
+                    "diff_hunk": "@@ -52,6 +55,51 @@ export type MonitorDiscordOpts = {\n   replyToMode?: ReplyToMode;\n };\n \n+function createDiscordGatewayPlugin(params: {\n+  discordConfig: DiscordAccountConfig;\n+  runtime: RuntimeEnv;\n+}): GatewayPlugin {\n+  const intents = resolveDiscordGatewayIntents(params.discordConfig?.intents);\n+  const proxy = params.discordConfig?.proxy?.trim();\n+  const options = {\n+    reconnect: { maxAt",
                     "has_suggestion_block": false
                   }
                 ],
-                "total_review_comments": 14,
-                "review_rounds": 20
+                "total_review_comments": 4,
+                "review_rounds": 3
               },
               {
-                "pr_number": 15715,
-                "pr_title": "WIP: local changes before upstream sync",
-                "author": "sid1943",
+                "pr_number": 11252,
+                "pr_title": "fix: fallback to install.sh script when update fails",
+                "author": "joeykrug",
                 "merged": false,
                 "has_formal_rejection": false,
                 "review_bodies": [
                   {
                     "author": "greptile-apps[bot]",
                     "state": "COMMENTED",
-                    "body": "<sub>58 files reviewed, 2 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
-                  },
-                  {
-                    "author": "chatgpt-codex-connector[bot]",
-                    "state": "COMMENTED",
-                    "body": "### \ud83d\udca1 Codex Review\n\nHere are some automated review suggestions for this pull request.\n\n**Reviewed commit:** `a51fc9158b`\n    \n\n<details> <summary>\u2139\ufe0f About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](http://chatgpt.com/codex/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\".\n\nIf Codex has suggestions, it will comment; otherwise it will react with \ud83d\udc4d.\n\n\n\n\nCodex c"
+                    "body": "<sub>2 files reviewed, 4 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
                   }
                 ],
                 "inline_review_comments": [
                   {
                     "author": "greptile-apps[bot]",
-                    "body": "**Committed local config + token**\n\nThis file appears to be a developer-local config snapshot (absolute path under `/Users/...`) and it includes a live `gateway.auth.token`. Committing this leaks a reusable secret and also bakes in machine-specific paths; these `.tmp/**/openclaw.json*` files should be removed from the PR (and the leaked token should be rotated).\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\nThis is a comment left during a code review.\nPath: .tmp/dev/openclaw.",
-                    "path": ".tmp/dev/openclaw.json",
-                    "diff_hunk": "@@ -0,0 +1,48 @@\n+{\n+  \"agents\": {\n+    \"defaults\": {",
+                    "body": "**Fallback can loop/crash**\n\nIn the fallback path you call `runInstallScriptUpdate(...)` without handling exceptions. If the install-script updater throws (e.g., `bash`/`curl` missing), this handler will throw out of the request instead of returning an `UpdateRunResult`. Consider wrapping this call in its own try/catch and returning an error result (or reusing the existing outer fallback path).\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\nThis is a comment left during a code",
+                    "path": "src/gateway/server-methods/update.ts",
+                    "diff_hunk": "@@ -47,31 +48,66 @@ export const updateHandlers: GatewayRequestHandlers = {\n       typeof timeoutMsRaw === \"number\" && Number.isFinite(timeoutMsRaw)\n         ? Math.max(1000, Math.floor(timeoutMsRaw))\n         : undefined;\n+    // New parameter: use install script method\n+    const useInstallScript =\n+      (params as { useInstallScript?: unknown }).useInstallScript === true;\n \n-    let result: Aw",
                     "has_suggestion_block": false
                   },
                   {
                     "author": "greptile-apps[bot]",
-                    "body": "**Unexpected npm lockfile**\n\nThis PR adds a new root `package-lock.json` (~14k lines). The repo uses `pnpm` (and typically relies on `pnpm-lock.yaml`), so committing an npm lockfile will create conflicting dependency sources and CI drift unless the project explicitly switched package managers. If this is accidental, drop `package-lock.json` from the PR; if intentional, the repo needs an explicit migration and updates to tooling/docs/CI in the same PR.\n\n<details><summary>Prompt To Fix With AI</su",
-                    "path": "package-lock.json",
-                    "diff_hunk": "@@ -0,0 +1,13998 @@\n+{\n+  \"name\": \"openclaw\",\n+  \"version\": \"2026.2.12\",",
+                    "body": "**Wrong error reported**\n\nIn the nested fallback, the inner `catch { ... }` discards the actual error from `runInstallScriptUpdate` and then reports `String(err)` from the *outer* catch. If the complex update throws and the install-script fallback also throws, the user will see the wrong failure reason. Bind the inner error (e.g., `catch (fallbackErr)`) and use that for `reason`.\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\nThis is a comment left during a code review.\nPath: ",
+                    "path": "src/gateway/server-methods/update.ts",
+                    "diff_hunk": "@@ -47,31 +48,66 @@ export const updateHandlers: GatewayRequestHandlers = {\n       typeof timeoutMsRaw === \"number\" && Number.isFinite(timeoutMsRaw)\n         ? Math.max(1000, Math.floor(timeoutMsRaw))\n         : undefined;\n+    // New parameter: use install script method\n+    const useInstallScript =\n+      (params as { useInstallScript?: unknown }).useInstallScript === true;\n \n-    let result: Aw",
                     "has_suggestion_block": false
                   },
                   {
-                    "author": "chatgpt-codex-connector[bot]",
-                    "body": "**<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat)</sub></sub>  Pass overridden port to gateway readiness checks**\n\nThe new `start` command accepts `--port` and uses it for daemon install, but readiness probing calls `callGateway` without any URL/port override, so it always checks the port from config. If a user runs `openclaw start --port <non-default>`, the gateway can be healthy while this check still times out because it probes the wrong socket.\n\nUseful? React with \ud83d\udc4d\u00a0",
-                    "path": "src/cli/start-cli.ts",
-                    "diff_hunk": "@@ -0,0 +1,148 @@\n+import type { Command } from \"commander\";\n+import { channelsStatusCommand } from \"../commands/channels.js\";\n+import {\n+  detectLegacyStateMigrations,\n+  runLegacyStateMigrations,\n+} from \"../commands/doctor-state-migrations.js\";\n+import { loadConfig, resolveGatewayPort } from \"../config/config.js\";\n+import { callGateway } from \"../gateway/call.js\";\n+import { defaultRuntime } fro",
+                    "author": "greptile-apps[bot]",
+                    "body": "**Windows/container runtime break**\n\n`runInstallScriptUpdate` always executes `bash -c ...` and assumes both `bash` and `curl` exist. On Windows (no bash by default) and minimal Linux images (e.g., Alpine without bash/curl), `runCommandWithTimeout` will throw, which then breaks the update handler unless caught. If this fallback is meant to improve reliability, it needs a preflight check (or a clearer error result) for missing executables/platform support.\n\n<details><summary>Prompt To Fix With AI",
+                    "path": "src/infra/update-install-script.ts",
+                    "diff_hunk": "@@ -0,0 +1,133 @@\n+/**\n+ * Fallback update method using the official install script.\n+ * This is more reliable than the complex git/npm update logic.\n+ */\n+\n+import os from \"node:os\";\n+import path from \"node:path\";\n+import fs from \"node:fs/promises\";\n+import { runCommandWithTimeout, type CommandOptions } from \"../process/exec.js\";\n+import { trimLogTail } from \"./restart-sentinel.js\";\n+import type ",
                     "has_suggestion_block": false
                   },
                   {
-                    "author": "chatgpt-codex-connector[bot]",
-                    "body": "**<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat)</sub></sub>  Remove committed gateway auth token from temp config**\n\nThis commit adds a tracked temp config containing a concrete `gateway.auth.token`, which leaks authentication material into repository history. Even if it was generated locally, committed secrets are broadly accessible to anyone with repo access and can be reused accidentally; these files should not contain real tokens.\n\nUseful? React with \ud83d\udc4d\u00a0/ \ud83d\udc4e.",
-                    "path": ".tmp/dev/openclaw.json",
-                    "diff_hunk": "@@ -0,0 +1,48 @@\n+{\n+  \"agents\": {\n+    \"defaults\": {\n+      \"workspace\": \"/Users/jarvis/.openclaw/workspace-dev\",\n+      \"skipBootstrap\": true,\n+      \"maxConcurrent\": 4,\n+      \"subagents\": {\n+        \"maxConcurrent\": 8\n+      },\n+      \"contextPruning\": {\n+        \"mode\": \"cache-ttl\",\n+        \"ttl\": \"1h\"\n+      },\n+      \"heartbeat\": {\n+        \"every\": \"30m\"\n+      },\n+      \"compaction\": {\n+",
-                    "has_suggestion_block": false
-                  },
-                  {
-                    "author": "chatgpt-codex-connector[bot]",
-                    "body": "**<sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub>  Point network test config at the existing chutes OAuth test**\n\nThe network test include list references `src/commands/chutes-oauth.test.ts`, but the actual test file in this repo is `src/commands/chutes-oauth.e2e.test.ts`. This typo causes `test:integration:network` to skip that suite, and the matching typo in unit excludes means test partitioning is inconsistent.\n\nUseful? React with \ud83d\udc4d\u00a0/ \ud83d\udc4e.",
-                    "path": "vitest.network.config.ts",
-                    "diff_hunk": "@@ -0,0 +1,21 @@\n+import { defineConfig } from \"vitest/config\";\n+import baseConfig from \"./vitest.config.ts\";\n+\n+const baseTest = (baseConfig as { test?: { exclude?: string[] } }).test ?? {};\n+const exclude = baseTest.exclude ?? [];\n+\n+export default defineConfig({\n+  ...baseConfig,\n+  test: {\n+    ...baseTest,\n+    include: [\n+      \"src/browser/cdp.test.ts\",\n+      \"src/canvas-host/server.test.t",
+                    "author": "greptile-apps[bot]",
+                    "body": "**Channel type cast bypasses validation**\n\n`channel: configChannel as \"stable\" | \"beta\" | \"dev\" | undefined` bypasses the runtime validation that `normalizeUpdateChannel` provides (and also ignores its `null` possibility). If `normalizeUpdateChannel` ever returns an unexpected value (or its return type changes), this will flow into the install script call without checks. Prefer passing `configChannel ?? undefined` with the correct type, or explicitly narrowing instead of asserting.\n\n<details><su",
+                    "path": "src/gateway/server-methods/update.ts",
+                    "diff_hunk": "@@ -47,31 +48,66 @@ export const updateHandlers: GatewayRequestHandlers = {\n       typeof timeoutMsRaw === \"number\" && Number.isFinite(timeoutMsRaw)\n         ? Math.max(1000, Math.floor(timeoutMsRaw))\n         : undefined;\n+    // New parameter: use install script method\n+    const useInstallScript =\n+      (params as { useInstallScript?: unknown }).useInstallScript === true;\n \n-    let result: Aw",
                     "has_suggestion_block": false
                   }
                 ],
-                "total_review_comments": 5,
-                "review_rounds": 2
+                "total_review_comments": 4,
+                "review_rounds": 1
               }
             ]
           }
         }
       },
       "error": null,
-      "duration_seconds": 261.04
+      "duration_seconds": 148.71
     },
     {
       "name": "Provenance Coverage",
-      "score": 0.4004,
+      "score": 0.9909,
       "details": {
-        "total_rules": 753,
-        "rules_with_provenance_url": 258,
-        "rules_with_provenance_summary": 345,
-        "valid_github_urls": 258,
-        "url_coverage_pct": 34.3,
-        "summary_coverage_pct": 45.8
+        "total_rules": 991,
+        "rules_with_provenance_url": 973,
+        "rules_with_provenance_summary": 991,
+        "valid_github_urls": 973,
+        "url_coverage_pct": 98.2,
+        "summary_coverage_pct": 100.0
       },
       "error": null,
-      "duration_seconds": 0.05
+      "duration_seconds": 0.01
     },
     {
       "name": "Path Scoping Coverage",
-      "score": 0.2683,
+      "score": 0.5126,
       "details": {
-        "total_rules": 753,
-        "rules_with_paths": 202,
-        "rules_with_valid_globs": 201,
-        "path_coverage_pct": 26.8
+        "total_rules": 991,
+        "rules_with_paths": 508,
+        "rules_with_valid_globs": 507,
+        "path_coverage_pct": 51.3
       },
       "error": null,
-      "duration_seconds": 0.04
+      "duration_seconds": 0.01
     },
     {
       "name": "Modular Rules Generation",
-      "score": 1.0,
+      "score": 0.996,
       "details": {
-        "total_files_generated": 128,
-        "valid_files": 128,
-        "repos_with_donot": 7,
-        "file_validity_pct": 100.0,
+        "total_files_generated": 174,
+        "valid_files": 173,
+        "repos_with_donot": 8,
+        "file_validity_pct": 99.4,
         "donot_coverage_pct": 100.0,
         "per_repo": {
           "langchain-ai/langchain": {
-            "total_files": 14,
-            "valid_files": 14,
+            "total_files": 20,
+            "valid_files": 20,
+            "has_donot": true,
+            "file_paths": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/do-not.md",
+              ".claude/rules/**/architecture.md",
+              ".claude/rules/**/domain.md",
+              ".claude/rules/**/style.md",
+              ".claude/rules/**/workflow.md",
+              ".claude/rules/architecture.md",
+              ".claude/rules/code-style.md",
+              ".claude/rules/domain.md",
+              ".claude/rules/libs/architecture.md"
+            ]
+          },
+          "denoland/deno": {
+            "total_files": 34,
+            "valid_files": 34,
+            "has_donot": true,
+            "file_paths": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/do-not.md",
+              ".claude/rules/**/architecture.md",
+              ".claude/rules/**/performance.md",
+              ".claude/rules/**/security.md",
+              ".claude/rules/**/style.md",
+              ".claude/rules/**/workflow.md",
+              ".claude/rules/.github/style.md",
+              ".claude/rules/.github/workflow.md",
+              ".claude/rules/architecture.md"
+            ]
+          },
+          "prisma/prisma": {
+            "total_files": 19,
+            "valid_files": 19,
             "has_donot": true,
             "file_paths": [
               ".claude/CLAUDE.md",
@@ -998,203 +939,193 @@
               ".claude/rules/testing.md",
               ".claude/rules/workflow.md",
               ".claude/rules/architecture.md",
-              ".claude/rules/domain.md",
-              ".claude/rules/libs/formatting.md",
-              ".claude/rules/libs/core.md",
-              ".claude/rules/libs/langchain-legacy.md"
+              ".claude/rules/security.md",
+              ".claude/rules/ci.md",
+              ".claude/rules/performance.md",
+              ".claude/rules/client/functional-tests.md"
             ]
           },
-          "denoland/deno": {
-            "total_files": 15,
-            "valid_files": 15,
+          "vercel/next.js": {
+            "total_files": 10,
+            "valid_files": 9,
+            "has_donot": true,
+            "file_paths": [
+              "CLAUDE.md",
+              ".claude/rules/do-not.md",
+              ".claude/rules/testing.md",
+              ".claude/rules/code-style.md",
+              ".claude/rules/architecture.md",
+              ".claude/rules/workflow.md",
+              ".claude/rules/ci.md",
+              ".claude/rules/rust/conventions.md",
+              ".claude/rules/next-core/architecture.md",
+              ".claude/rules/test/conventions.md"
+            ]
+          },
+          "facebook/react": {
+            "total_files": 25,
+            "valid_files": 25,
+            "has_donot": true,
+            "file_paths": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/code-style.md",
+              ".claude/rules/code-style-packages.md",
+              ".claude/rules/code-style-scripts.md",
+              ".claude/rules/code-style-jsx.md",
+              ".claude/rules/code-style-typescript.md",
+              ".claude/rules/testing.md",
+              ".claude/rules/testing-config.md",
+              ".claude/rules/workflow.md",
+              ".claude/rules/workflow-flow.md"
+            ]
+          },
+          "anthropics/claude-code": {
+            "total_files": 25,
+            "valid_files": 25,
+            "has_donot": true,
+            "file_paths": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/do-not.md",
+              ".claude/rules/**/design.md",
+              ".claude/rules/**/domain.md",
+              ".claude/rules/**/product.md",
+              ".claude/rules/.claude/architecture.md",
+              ".claude/rules/.claude/domain.md",
+              ".claude/rules/.devcontainer/architecture.md",
+              ".claude/rules/.devcontainer/security.md",
+              ".claude/rules/.devcontainer/workflow.md"
+            ]
+          },
+          "anthropics/claude-agent-sdk-python": {
+            "total_files": 13,
+            "valid_files": 13,
+            "has_donot": true,
+            "file_paths": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/code-style.md",
+              ".claude/rules/testing.md",
+              ".claude/rules/do-not.md",
+              ".claude/rules/workflow.md",
+              ".claude/rules/architecture.md",
+              ".claude/rules/domain.md",
+              ".claude/rules/product.md",
+              ".claude/rules/ci.md",
+              ".claude/rules/sdk/types-and-api.md"
+            ]
+          },
+          "openclaw/openclaw": {
+            "total_files": 28,
+            "valid_files": 28,
             "has_donot": true,
             "file_paths": [
               ".claude/CLAUDE.md",
               ".claude/rules/do-not.md",
               ".claude/rules/**/architecture.md",
               ".claude/rules/**/style.md",
-              ".claude/rules/architecture.md",
-              ".claude/rules/cli/style.md",
-              ".claude/rules/design.md",
-              ".claude/rules/domain.md",
-              ".claude/rules/ext/architecture.md",
-              ".claude/rules/general.md"
-            ]
-          },
-          "prisma/prisma": {
-            "total_files": 16,
-            "valid_files": 16,
-            "has_donot": true,
-            "file_paths": [
-              ".claude/CLAUDE.md",
-              ".claude/rules/do-not.md",
-              ".claude/rules/code-style.md",
-              ".claude/rules/testing.md",
-              ".claude/rules/workflow.md",
-              ".claude/rules/architecture.md",
-              ".claude/rules/ci.md",
-              ".claude/rules/security.md",
-              ".claude/rules/domain.md",
-              ".claude/rules/product.md"
-            ]
-          },
-          "vercel/next.js": {
-            "total_files": 18,
-            "valid_files": 18,
-            "has_donot": true,
-            "file_paths": [
-              ".claude/CLAUDE.md",
-              ".claude/rules/do-not.md",
-              ".claude/rules/apps/workflow.md",
-              ".claude/rules/architecture.md",
-              ".claude/rules/code-style.md",
-              ".claude/rules/crates/architecture.md",
-              ".claude/rules/crates/performance.md",
-              ".claude/rules/crates/style.md",
-              ".claude/rules/crates/testing.md",
-              ".claude/rules/design.md"
-            ]
-          },
-          "facebook/react": {
-            "total_files": 14,
-            "valid_files": 14,
-            "has_donot": true,
-            "file_paths": [
-              ".claude/CLAUDE.md",
-              ".claude/rules/code-style.md",
-              ".claude/rules/testing.md",
-              ".claude/rules/do-not.md",
-              ".claude/rules/workflow.md",
-              ".claude/rules/architecture.md",
-              ".claude/rules/product.md",
-              ".claude/rules/domain.md",
-              ".claude/rules/compiler/workflow.md",
-              ".claude/rules/compiler/anti-patterns.md"
-            ]
-          },
-          "anthropics/claude-code": {
-            "total_files": 16,
-            "valid_files": 16,
-            "has_donot": true,
-            "file_paths": [
-              ".claude/CLAUDE.md",
-              ".claude/rules/code-style.md",
-              ".claude/rules/testing.md",
-              ".claude/rules/do-not.md",
-              ".claude/rules/workflow.md",
-              ".claude/rules/architecture.md",
-              ".claude/rules/security.md",
-              ".claude/rules/ci.md",
-              ".claude/rules/domain.md",
-              ".claude/rules/design.md"
-            ]
-          },
-          "openclaw/openclaw": {
-            "total_files": 35,
-            "valid_files": 35,
-            "has_donot": true,
-            "file_paths": [
-              ".claude/CLAUDE.md",
-              ".claude/rules/do-not.md",
-              ".claude/rules/**/style.md",
               ".claude/rules/**/testing.md",
+              ".claude/rules/**/workflow.md",
+              ".claude/rules/.github/workflow.md",
               ".claude/rules/agent/domain.md",
-              ".claude/rules/architecture.md",
-              ".claude/rules/canvas-host/domain.md",
-              ".claude/rules/channels/security.md",
-              ".claude/rules/cli/architecture.md",
-              ".claude/rules/cli/style.md"
+              ".claude/rules/agents/architecture.md",
+              ".claude/rules/agents/testing.md"
             ]
           }
         }
       },
       "error": null,
-      "duration_seconds": 1242.18
+      "duration_seconds": 2557.21
     },
     {
       "name": "Incremental Extraction",
       "score": 1.0,
       "details": {
-        "successful_extractions": 7,
-        "total_attempts": 7,
+        "successful_extractions": 8,
+        "total_attempts": 8,
         "per_repo": {
           "langchain-ai/langchain": {
-            "pr_number": 35115,
+            "pr_number": 35067,
             "new_rules": 0,
-            "new_proposals": 1,
+            "new_proposals": 4,
             "auto_approved_count": 0,
             "confidence_check_passed": true
           },
           "denoland/deno": {
-            "pr_number": 31993,
-            "new_rules": 0,
-            "new_proposals": 3,
-            "auto_approved_count": 0,
-            "confidence_check_passed": true
-          },
-          "prisma/prisma": {
-            "pr_number": 29038,
-            "new_rules": 0,
-            "new_proposals": 1,
-            "auto_approved_count": 0,
-            "confidence_check_passed": true
-          },
-          "vercel/next.js": {
-            "pr_number": 87938,
+            "pr_number": 32138,
             "new_rules": 0,
             "new_proposals": 0,
             "auto_approved_count": 0,
             "confidence_check_passed": true
           },
+          "prisma/prisma": {
+            "pr_number": 29089,
+            "new_rules": 2,
+            "new_proposals": 2,
+            "auto_approved_count": 0,
+            "confidence_check_passed": true
+          },
+          "vercel/next.js": {
+            "pr_number": 89166,
+            "new_rules": 0,
+            "new_proposals": 2,
+            "auto_approved_count": 0,
+            "confidence_check_passed": true
+          },
           "facebook/react": {
-            "pr_number": 35773,
+            "pr_number": 35720,
             "new_rules": 0,
             "new_proposals": 1,
             "auto_approved_count": 0,
             "confidence_check_passed": true
           },
           "anthropics/claude-code": {
-            "pr_number": 17238,
+            "pr_number": 18198,
+            "new_rules": 0,
+            "new_proposals": 0,
+            "auto_approved_count": 0,
+            "confidence_check_passed": true
+          },
+          "anthropics/claude-agent-sdk-python": {
+            "pr_number": 485,
             "new_rules": 0,
             "new_proposals": 0,
             "auto_approved_count": 0,
             "confidence_check_passed": true
           },
           "openclaw/openclaw": {
-            "pr_number": 15715,
-            "new_rules": 0,
-            "new_proposals": 4,
+            "pr_number": 11853,
+            "new_rules": 2,
+            "new_proposals": 3,
             "auto_approved_count": 0,
             "confidence_check_passed": true
           }
         }
       },
       "error": null,
-      "duration_seconds": 539.25
+      "duration_seconds": 517.55
     },
     {
       "name": "Outcome Metrics Collection",
       "score": 1.0,
       "details": {
-        "repos_with_valid_metrics": 7,
-        "total_repos": 7,
+        "repos_with_valid_metrics": 8,
+        "total_repos": 8,
         "per_repo": {
           "langchain-ai/langchain": {
             "metrics": {
-              "total_prs": 23,
-              "avg_review_rounds": 0.57,
-              "ci_failure_rate": 0.145,
-              "avg_time_to_merge_hours": 25.1
+              "total_prs": 20,
+              "avg_review_rounds": 0.65,
+              "ci_failure_rate": 0.137,
+              "avg_time_to_merge_hours": 28.5
             },
             "fields_present": 4,
             "values_reasonable": true
           },
           "denoland/deno": {
             "metrics": {
-              "total_prs": 43,
-              "avg_review_rounds": 1.83,
-              "ci_failure_rate": 0.0,
-              "avg_time_to_merge_hours": 49.1
+              "total_prs": 42,
+              "avg_review_rounds": 1.93,
+              "ci_failure_rate": 0.009,
+              "avg_time_to_merge_hours": 45.3
             },
             "fields_present": 4,
             "values_reasonable": true
@@ -1211,10 +1142,10 @@
           },
           "vercel/next.js": {
             "metrics": {
-              "total_prs": 17,
-              "avg_review_rounds": 3.12,
-              "ci_failure_rate": 0.067,
-              "avg_time_to_merge_hours": 41.4
+              "total_prs": 8,
+              "avg_review_rounds": 1.5,
+              "ci_failure_rate": 0.075,
+              "avg_time_to_merge_hours": 2.9
             },
             "fields_present": 4,
             "values_reasonable": true
@@ -1231,20 +1162,30 @@
           },
           "anthropics/claude-code": {
             "metrics": {
-              "total_prs": 4,
-              "avg_review_rounds": 1.5,
+              "total_prs": 5,
+              "avg_review_rounds": 1.2,
               "ci_failure_rate": 0.0,
-              "avg_time_to_merge_hours": 19.1
+              "avg_time_to_merge_hours": 2.4
+            },
+            "fields_present": 4,
+            "values_reasonable": true
+          },
+          "anthropics/claude-agent-sdk-python": {
+            "metrics": {
+              "total_prs": 4,
+              "avg_review_rounds": 1.0,
+              "ci_failure_rate": 0.0,
+              "avg_time_to_merge_hours": 6.6
             },
             "fields_present": 4,
             "values_reasonable": true
           },
           "openclaw/openclaw": {
             "metrics": {
-              "total_prs": 23,
-              "avg_review_rounds": 2.57,
+              "total_prs": 7,
+              "avg_review_rounds": 1.29,
               "ci_failure_rate": 0.0,
-              "avg_time_to_merge_hours": 92.2
+              "avg_time_to_merge_hours": 56.2
             },
             "fields_present": 4,
             "values_reasonable": true
@@ -1252,177 +1193,177 @@
         }
       },
       "error": null,
-      "duration_seconds": 316.65
+      "duration_seconds": 357.77
     },
     {
       "name": "Domain Knowledge Extraction",
-      "score": 0.8105,
+      "score": 0.7806,
       "details": {
-        "repos_with_domain_rules": 7,
-        "total_domain_rules": 192,
-        "total_repos": 7,
+        "repos_with_domain_rules": 6,
+        "total_domain_rules": 191,
+        "total_repos": 8,
         "sub_evals": {
           "7a_content_quality": {
             "weight": 0.3,
-            "score": 0.8743,
+            "score": 0.8325,
             "per_repo": {
               "langchain-ai/langchain": {
                 "rules_sampled": 10,
-                "avg_specificity": 4.6,
-                "avg_actionability": 4.0,
-                "score": 0.86
+                "avg_specificity": 4.5,
+                "avg_actionability": 3.9,
+                "score": 0.84
               },
               "denoland/deno": {
                 "rules_sampled": 10,
                 "avg_specificity": 4.4,
-                "avg_actionability": 3.6,
-                "score": 0.8
+                "avg_actionability": 3.3,
+                "score": 0.77
               },
               "prisma/prisma": {
-                "rules_sampled": 5,
-                "avg_specificity": 4.6,
-                "avg_actionability": 4.0,
-                "score": 0.86
+                "skipped": true,
+                "reason": "no domain rules"
               },
               "vercel/next.js": {
-                "rules_sampled": 10,
-                "avg_specificity": 5.0,
-                "avg_actionability": 4.6,
-                "score": 0.96
+                "skipped": true,
+                "reason": "no domain rules"
               },
               "facebook/react": {
                 "rules_sampled": 10,
-                "avg_specificity": 4.4,
-                "avg_actionability": 3.1,
-                "score": 0.75
+                "avg_specificity": 3.8,
+                "avg_actionability": 2.7,
+                "score": 0.65
               },
               "anthropics/claude-code": {
                 "rules_sampled": 10,
-                "avg_specificity": 5.0,
-                "avg_actionability": 4.5,
-                "score": 0.95
+                "avg_specificity": 4.9,
+                "avg_actionability": 4.1,
+                "score": 0.9
               },
-              "openclaw/openclaw": {
+              "anthropics/claude-agent-sdk-python": {
                 "rules_sampled": 10,
                 "avg_specificity": 4.9,
-                "avg_actionability": 4.5,
-                "score": 0.94
+                "avg_actionability": 4.2,
+                "score": 0.91
+              },
+              "openclaw/openclaw": {
+                "rules_sampled": 8,
+                "avg_specificity": 5.0,
+                "avg_actionability": 4.25,
+                "score": 0.925
               }
             }
           },
           "7b_domain_coverage": {
             "weight": 0.25,
-            "score": 0.6071,
+            "score": 0.4833,
             "per_repo": {
               "langchain-ai/langchain": {
                 "rules_count": 21,
-                "llm_failed": true,
-                "score": 0.5
-              },
-              "denoland/deno": {
-                "rules_count": 50,
-                "llm_failed": true,
-                "score": 0.5
-              },
-              "prisma/prisma": {
-                "rules_count": 5,
-                "has_readme": true,
-                "completeness": 6,
-                "depth": 7,
-                "score": 0.65
-              },
-              "vercel/next.js": {
-                "rules_count": 15,
-                "has_readme": true,
-                "completeness": 7,
-                "depth": 6,
-                "score": 0.65
-              },
-              "facebook/react": {
-                "rules_count": 40,
                 "has_readme": true,
                 "completeness": 4,
                 "depth": 6,
                 "score": 0.5
               },
-              "anthropics/claude-code": {
+              "denoland/deno": {
                 "rules_count": 38,
-                "has_readme": true,
-                "completeness": 7,
-                "depth": 8,
-                "score": 0.75
+                "llm_failed": true,
+                "score": 0.5
               },
-              "openclaw/openclaw": {
-                "rules_count": 23,
+              "prisma/prisma": {
+                "skipped": true,
+                "reason": "no domain rules"
+              },
+              "vercel/next.js": {
+                "skipped": true,
+                "reason": "no domain rules"
+              },
+              "facebook/react": {
+                "rules_count": 22,
+                "has_readme": true,
+                "completeness": 2,
+                "depth": 3,
+                "score": 0.25
+              },
+              "anthropics/claude-code": {
+                "rules_count": 44,
+                "llm_failed": true,
+                "score": 0.5
+              },
+              "anthropics/claude-agent-sdk-python": {
+                "rules_count": 58,
                 "has_readme": true,
                 "completeness": 6,
-                "depth": 8,
-                "score": 0.7
+                "depth": 7,
+                "score": 0.65
+              },
+              "openclaw/openclaw": {
+                "rules_count": 8,
+                "llm_failed": true,
+                "score": 0.5
               }
             }
           },
           "7c_confidence_calibration": {
             "weight": 0.15,
-            "score": 0.8286,
+            "score": 0.8,
             "per_repo": {
               "langchain-ai/langchain": {
-                "domain_avg_conf": 0.871,
-                "code_avg_conf": 0.927,
-                "conf_spread": 0.0299,
+                "domain_avg_conf": 0.881,
+                "code_avg_conf": 0.924,
+                "conf_spread": 0.0335,
                 "calibrated": true,
-                "differentiated": false,
+                "differentiated": true,
                 "no_ceiling": true,
-                "score": 0.7
+                "score": 1.0
               },
               "denoland/deno": {
-                "domain_avg_conf": 0.869,
-                "code_avg_conf": 0.917,
-                "conf_spread": 0.0265,
+                "domain_avg_conf": 0.868,
+                "code_avg_conf": 0.906,
+                "conf_spread": 0.0337,
                 "calibrated": true,
-                "differentiated": false,
+                "differentiated": true,
                 "no_ceiling": true,
-                "score": 0.7
+                "score": 1.0
               },
               "prisma/prisma": {
-                "domain_avg_conf": 0.89,
-                "code_avg_conf": 0.906,
-                "conf_spread": 0.0224,
+                "skipped": true,
+                "reason": "no domain rules"
+              },
+              "vercel/next.js": {
+                "skipped": true,
+                "reason": "no domain rules"
+              },
+              "facebook/react": {
+                "domain_avg_conf": 0.841,
+                "code_avg_conf": 0.879,
+                "conf_spread": 0.0197,
                 "calibrated": true,
                 "differentiated": false,
                 "no_ceiling": true,
                 "score": 0.7
               },
-              "vercel/next.js": {
-                "domain_avg_conf": 0.847,
-                "code_avg_conf": 0.885,
-                "conf_spread": 0.0399,
-                "calibrated": true,
-                "differentiated": true,
-                "no_ceiling": true,
-                "score": 1.0
-              },
-              "facebook/react": {
-                "domain_avg_conf": 0.845,
-                "code_avg_conf": 0.873,
-                "conf_spread": 0.0316,
-                "calibrated": true,
-                "differentiated": true,
-                "no_ceiling": true,
-                "score": 1.0
-              },
               "anthropics/claude-code": {
-                "domain_avg_conf": 0.864,
+                "domain_avg_conf": 0.84,
                 "code_avg_conf": 0.917,
-                "conf_spread": 0.0327,
+                "conf_spread": 0.0297,
                 "calibrated": true,
-                "differentiated": true,
+                "differentiated": false,
                 "no_ceiling": true,
-                "score": 1.0
+                "score": 0.7
+              },
+              "anthropics/claude-agent-sdk-python": {
+                "domain_avg_conf": 0.867,
+                "code_avg_conf": 0.92,
+                "conf_spread": 0.0257,
+                "calibrated": true,
+                "differentiated": false,
+                "no_ceiling": true,
+                "score": 0.7
               },
               "openclaw/openclaw": {
-                "domain_avg_conf": 0.852,
-                "code_avg_conf": 0.884,
-                "conf_spread": 0.0281,
+                "domain_avg_conf": 0.894,
+                "code_avg_conf": 0.905,
+                "conf_spread": 0.0177,
                 "calibrated": true,
                 "differentiated": false,
                 "no_ceiling": true,
@@ -1432,13 +1373,13 @@
           },
           "7d_category_accuracy": {
             "weight": 0.15,
-            "score": 0.8143,
+            "score": 0.9333,
             "per_repo": {
               "langchain-ai/langchain": {
                 "rules_sampled": 10,
-                "matches": 9,
+                "matches": 10,
                 "total_judged": 10,
-                "accuracy": 0.9
+                "accuracy": 1.0
               },
               "denoland/deno": {
                 "rules_sampled": 10,
@@ -1447,33 +1388,35 @@
                 "accuracy": 0.9
               },
               "prisma/prisma": {
-                "rules_sampled": 5,
-                "matches": 3,
-                "total_judged": 5,
-                "accuracy": 0.6
+                "skipped": true,
+                "reason": "no domain rules"
               },
               "vercel/next.js": {
-                "rules_sampled": 10,
-                "matches": 8,
-                "total_judged": 10,
-                "accuracy": 0.8
+                "skipped": true,
+                "reason": "no domain rules"
               },
               "facebook/react": {
-                "rules_sampled": 10,
-                "matches": 8,
-                "total_judged": 10,
-                "accuracy": 0.8
-              },
-              "anthropics/claude-code": {
                 "rules_sampled": 10,
                 "matches": 7,
                 "total_judged": 10,
                 "accuracy": 0.7
               },
-              "openclaw/openclaw": {
+              "anthropics/claude-code": {
                 "rules_sampled": 10,
                 "matches": 10,
                 "total_judged": 10,
+                "accuracy": 1.0
+              },
+              "anthropics/claude-agent-sdk-python": {
+                "rules_sampled": 10,
+                "matches": 10,
+                "total_judged": 10,
+                "accuracy": 1.0
+              },
+              "openclaw/openclaw": {
+                "rules_sampled": 8,
+                "matches": 8,
+                "total_judged": 8,
                 "accuracy": 1.0
               }
             }
@@ -1481,8 +1424,8 @@
           "7e_db_schema_selftest": {
             "weight": 0.15,
             "score": 1.0,
-            "agent_output_length": 4047,
-            "rules_extracted": 15,
+            "agent_output_length": 1556,
+            "rules_extracted": 10,
             "facts_found": 5,
             "total_expected_facts": 5,
             "fact_results": [
@@ -1517,81 +1460,174 @@
                 "found": true
               }
             ],
-            "temp_repo_id": 11
+            "temp_repo_id": 9
           }
         }
       },
       "error": null,
-      "duration_seconds": 505.51
+      "duration_seconds": 348.03
     },
     {
       "name": "Ground Truth Recall",
-      "score": 0.4882,
+      "score": 0.3717,
       "details": {
-        "repos_with_ground_truth": 6,
-        "total_repos": 7,
-        "avg_recall": 0.4882,
+        "repos_with_ground_truth": 7,
+        "total_repos": 8,
+        "avg_recall": 0.3717,
         "per_repo": {
           "langchain-ai/langchain": {
-            "total_rules": 64,
-            "contaminated": 40,
-            "independent": 24,
-            "total_guidelines": 21,
-            "matched": 12,
-            "recall": 0.5714
+            "total_rules": 154,
+            "contaminated": 71,
+            "independent": 83,
+            "total_guidelines": 16,
+            "matched": 13.5,
+            "recall": 0.8438,
+            "unmatched_examples": [
+              "[ ] Tests fail when your new logic is broken (incomplete checklist item, appears truncated)",
+              "Check if the function/class is exported in `__init__.py` (before making API changes)",
+              "Use keyword-only arguments for new parameters: `*, new_param: str = \"default\"`"
+            ],
+            "matched_examples": [
+              "Monorepo structure with libs/core/, libs/langchain/, libs/partners/, etc. (1.0 - rule 3 describes partners/ separation)",
+              "Use `uv` for dependency management (1.0 - rules 5, 21)",
+              "Run `make test` for unit tests (1.0 - rules 8, 23)",
+              "Run `make lint` and `make format` (1.0 - rules 9, 10, 25, 27)",
+              "Run `make format`, `make lint`, `make test` before PR submission (1.0 - rule 42)"
+            ],
+            "score": 0.84375
           },
           "denoland/deno": {
-            "total_rules": 140,
-            "contaminated": 32,
-            "independent": 108,
+            "total_rules": 207,
+            "contaminated": 66,
+            "independent": 141,
             "total_guidelines": 50,
-            "matched": 12,
-            "recall": 0.24
+            "matched": 0.0,
+            "recall": 0.0,
+            "unmatched_examples": [
+              "Store build artifacts with 3-day retention for testing but not long-term storage",
+              "Use actions/cache/restore for PR builds and actions/cache/save for main branch to optimize cache strategy",
+              "Exclude **/.claude/settings.local.json to keep Claude Code local settings out of version control",
+              "Exclude flamegraph*.svg and flamebench*.svg performance profiling outputs from version control",
+              "Exclude .ipynb_checkpoints/ and Untitled*.ipynb from version control"
+            ],
+            "matched_examples": [],
+            "score": 0.0
           },
           "prisma/prisma": {
-            "total_rules": 52,
-            "contaminated": 33,
-            "independent": 52,
-            "total_guidelines": 50,
-            "matched": 39,
-            "recall": 0.78
+            "total_rules": 99,
+            "contaminated": 30,
+            "independent": 69,
+            "total_guidelines": 46,
+            "matched": 24.5,
+            "recall": 0.5326,
+            "unmatched_examples": [
+              "Repository is a monorepo for Prisma ORM with TypeScript, Rust, WASM, TSX, Jest, pnpm",
+              "Managed via pnpm workspaces and Turborepo",
+              "Top-level scripts delegate to scripts/ci/publish.ts",
+              "Package-specific commands use `pnpm --filter @prisma/<pkg> <script>`",
+              "Run `pnpm build` from root to build all packages in dependency order"
+            ],
+            "matched_examples": [
+              "Node ^20.19 || ^22.12 || >=24.0 required (1.0) - matches rule 12 about CI running Node 20.19.0, 22.12.0, and 24",
+              "pnpm >=10.15 <11 required (1.0) - matches rule 18 exactly",
+              "Turborepo caches builds (1.0) - matches rule 28 about Turborepo caching configuration",
+              "CI tests driver adapters with specific flavors (1.0) - matches rule 11 listing js_pg, js_neon, etc.",
+              "TypeScript-first repo with WASM/Rust assets (0.5) - partially matches rule 5 about WASM engine builds"
+            ],
+            "score": 0.532608695652174
           },
           "vercel/next.js": {
-            "total_rules": 64,
-            "contaminated": 38,
-            "independent": 64,
-            "total_guidelines": 50,
-            "matched": 27,
-            "recall": 0.54
+            "total_rules": 77,
+            "contaminated": 29,
+            "independent": 48,
+            "total_guidelines": 48,
+            "matched": 19.5,
+            "recall": 0.4062,
+            "unmatched_examples": [
+              "Tests run in parallel groups (e.g., 1/7, 2/7, etc.) using node run-tests.js -g flag for load distribution",
+              "CI tests against multiple React versions including default and React 18.3.1 - use NEXT_TEST_REACT_VERSION environment variable to specify version",
+              "CI builds and tests both Turbopack and Webpack variants - use environment variables IS_TURBOPACK_TEST=1 and TURBOPACK_DEV=1 or TURBOPACK_BUILD=1 for Turbopack testing",
+              "CI skips builds and tests for docs-only changes (changes only to documentation files)",
+              "Clippy lint 'too_many_arguments' is explicitly allowed at workspace level"
+            ],
+            "matched_examples": [
+              "Build commands: pnpm --filter=next build and pnpm build (1.0)",
+              "Build specific task with pnpm --filter=next exec taskr <task> (1.0)",
+              "Fast local development with pnpm --filter=next dev watch mode (1.0)",
+              "Run tests fast with NEXT_SKIP_ISOLATE=1 NEXT_TEST_MODE=dev pnpm testonly (1.0)",
+              "Always rebuild after switching branches with pnpm build (1.0)"
+            ],
+            "score": 0.40625
           },
           "facebook/react": {
-            "total_rules": 73,
-            "contaminated": 14,
-            "independent": 73,
+            "total_rules": 87,
+            "contaminated": 2,
+            "independent": 85,
             "total_guidelines": 3,
-            "matched": 0,
-            "recall": 0.0
+            "matched": 0.0,
+            "recall": 0.0,
+            "unmatched_examples": [
+              "React is a JavaScript library for building user interfaces",
+              "React: All files outside `/compiler/`",
+              "React Compiler: `/compiler/` directory (has its own instructions)"
+            ],
+            "matched_examples": [],
+            "score": 0.0
           },
           "anthropics/claude-code": {
-            "total_rules": 0,
-            "contaminated": 0,
-            "independent": 0,
-            "total_guidelines": 0,
-            "matched": 0,
-            "recall": null
+            "skipped": true,
+            "reason": "no CLAUDE.md or AGENTS.md found"
+          },
+          "anthropics/claude-agent-sdk-python": {
+            "total_rules": 118,
+            "contaminated": 14,
+            "independent": 104,
+            "total_guidelines": 12,
+            "matched": 4.0,
+            "recall": 0.3333,
+            "unmatched_examples": [
+              "Run `python -m pytest tests/test_client.py` to run specific test file",
+              "`client.py` contains ClaudeSDKClient for interactive sessions",
+              "`query.py` contains one-shot query function",
+              "`types.py` contains type definitions",
+              "`_internal/` contains internal implementation details"
+            ],
+            "matched_examples": [
+              "Run `python -m pytest tests/` to run all tests (1.0)",
+              "Main package is in `src/claude_agent_sdk/` (1.0)",
+              "Run `python -m ruff check src/ tests/ --fix` to check and fix linting issues (0.5)",
+              "Run `python -m ruff format src/ tests/` to format code (0.5)",
+              "Run `python -m mypy src/` for typechecking (0.5)"
+            ],
+            "score": 0.3333333333333333
           },
           "openclaw/openclaw": {
-            "total_rules": 84,
-            "contaminated": 74,
-            "independent": 84,
-            "total_guidelines": 84,
-            "matched": 67,
-            "recall": 0.80
+            "total_rules": 146,
+            "contaminated": 63,
+            "independent": 83,
+            "total_guidelines": 108,
+            "matched": 52.5,
+            "recall": 0.4861,
+            "unmatched_examples": [
+              "Repo: https://github.com/openclaw/openclaw",
+              "GitHub issues/comments/PR comments: use literal multiline strings or `-F - <<'EOF'` (or $'...') for real newlines; never embed \"\\n\".",
+              "Source code: `src/` (CLI wiring in `src/cli`, commands in `src/commands`, web provider in `src/provider-web.ts`, infra in `src/infra`, media pipeline in `src/media`).",
+              "Tests: colocated `*.test.ts`.",
+              "Docs: `docs/` (images, queue, Pi config). Built output lives in `dist/`."
+            ],
+            "matched_examples": [
+              "Test setup file at test/setup.ts is loaded before all tests (1.0)",
+              "Run `pnpm check:docs` when docs files change (1.0)",
+              "Run `pnpm release:check` on push to main (1.0)",
+              "Gateway binds to loopback by default (1.0)",
+              "Docker runs as non-root user (USER node) (0.5)"
+            ],
+            "score": 0.4861111111111111
           }
         }
       },
       "error": null,
-      "duration_seconds": null
+      "duration_seconds": 181.82
     }
   ]
 }
