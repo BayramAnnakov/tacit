@@ -121,7 +121,7 @@ async def run_extractions(repo_ids: dict[str, int]) -> dict[str, int]:
 
         print(f"  [extract] {full} (repo_id={repo_id}) ...")
         try:
-            async for _ in run_extraction(full, TOKEN):
+            async for _ in run_extraction(full, TOKEN, exclude_ground_truth=True):
                 pass  # consume the async iterator
             rule_count = len(await db.list_rules(repo_id=repo_id))
             print(f"  [done] {full} -> {rule_count} rules extracted")
