@@ -61,6 +61,7 @@ REPOS = [
     ("vercel", "next.js"),
     ("facebook", "react"),
     ("anthropics", "claude-code"),
+    ("anthropics", "claude-agent-sdk-python"),
     ("openclaw", "openclaw"),
 ]
 
