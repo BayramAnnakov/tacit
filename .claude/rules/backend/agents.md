@@ -5,7 +5,7 @@ paths:
   - "tacit/backend/prompts/**"
 ---
 
-- 14 agents defined via `AgentDefinition` dataclass in `get_agent_definitions()`
+- 16 agents defined via `AgentDefinition` dataclass in `get_agent_definitions()`
 - Each agent requires: prompt file in `prompts/<name>.md`, model (`sonnet` or `opus`), tools list
 - To add an agent: create prompt file, add `AgentDefinition` in `agents.py`, wire into `pipeline.py`
 - Agent tool names must match entries in `_RAW_TOOL_NAMES` in `tools.py`
@@ -15,7 +15,10 @@ paths:
 **Extraction** (Phase 1-2):
 - `pr-scanner` (sonnet), `thread-analyzer` (opus), `structural-analyzer` (sonnet)
 - `docs-analyzer` (sonnet), `ci-failure-miner` (opus), `code-analyzer` (sonnet)
-- `anti-pattern-miner` (opus)
+- `anti-pattern-miner` (opus), `domain-analyzer` (sonnet)
+
+**Database analysis**:
+- `db-schema-analyzer` (opus) -- extracts domain knowledge from database schemas
 
 **Synthesis** (Phase 4):
 - `synthesizer` (opus), `generator` (opus), `modular-generator` (opus)

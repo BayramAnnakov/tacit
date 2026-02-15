@@ -23,13 +23,22 @@ swift build && swift run TacitApp
 # Or: open Package.swift  (Xcode)
 ```
 
+### CLI Tool
+
+```bash
+cd tacit/backend && source venv/bin/activate
+python __main__.py owner/repo                  # Extract + print CLAUDE.md
+python __main__.py owner/repo --modular        # Extract + print .claude/rules/
+python __main__.py owner/repo --skip-extract   # Reuse existing DB
+```
+
 ### Eval
 
 ```bash
 cd tacit/backend
 source venv/bin/activate
 python eval_extract.py               # v1: extraction quality vs ground truth
-python eval_v2.py                    # v2: 6 new capability evals
+python eval_v2.py                    # v2: 8 capability evals
 python eval_v2.py --skip-extraction  # v2: reuse existing DB
 ```
 
@@ -37,8 +46,8 @@ python eval_v2.py --skip-extraction  # v2: reuse existing DB
 
 Two components: Python FastAPI backend + SwiftUI macOS frontend, connected via REST + WebSocket.
 
-- **14 agents** defined in `agents.py` using `AgentDefinition` dataclass
-- **14 MCP tools** defined in `tools.py` using `@tool` decorator
+- **16 agents** defined in `agents.py` using `AgentDefinition` dataclass
+- **20 MCP tools** defined in `tools.py` and `db_tools.py` using `@tool` decorator
 - **4-phase extraction pipeline** in `pipeline.py`
 - **SQLite database** via `aiosqlite` (WAL mode)
 
@@ -49,11 +58,14 @@ See `.claude/rules/` for detailed conventions on each subsystem.
 | File | Purpose |
 |------|---------|
 | `tacit/backend/pipeline.py` | Extraction orchestrator (4-phase + session mining + incremental) |
-| `tacit/backend/agents.py` | Agent definitions (14 agents) |
-| `tacit/backend/tools.py` | MCP tools (14 tools) |
+| `tacit/backend/agents.py` | Agent definitions (16 agents) |
+| `tacit/backend/tools.py` | MCP tools (20 tools, including db_tools.py) |
+| `tacit/backend/db_tools.py` | Read-only database introspection tools (4 tools) |
 | `tacit/backend/database.py` | SQLite schema and CRUD |
 | `tacit/backend/main.py` | FastAPI app (REST + WebSocket + webhook) |
-| `tacit/backend/prompts/` | Agent prompt files (14 prompts) |
+| `tacit/backend/__main__.py` | CLI tool (`python __main__.py owner/repo`) |
+| `tacit/backend/eval_v2.py` | Eval suite (8 evals, 74% overall) |
+| `tacit/backend/prompts/` | Agent prompt files (16 prompts) |
 | `tacit/TacitApp/` | SwiftUI macOS frontend |
 
 ## Issue Tracking

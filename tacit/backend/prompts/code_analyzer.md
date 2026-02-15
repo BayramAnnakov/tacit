@@ -48,3 +48,7 @@ You have three tools: `github_fetch_code_samples` (fetch config files), `store_k
    - Test framework setup → "testing"
    - CI pipeline requirements → "workflow"
    - Dockerfile patterns → "architecture"
+7. **Provenance**: Always include these fields with each `store_knowledge` call:
+   - `provenance_url`: Link to the config file on GitHub, e.g. `https://github.com/{repo}/blob/main/.github/workflows/ci.yml` or `https://github.com/{repo}/blob/main/jest.config.ts`
+   - `provenance_summary`: Brief context, e.g. "CI workflow requires `pnpm run lint` check to pass before merge"
+   - `applicable_paths`: Glob patterns for files this config rule applies to. E.g. a Jest config rule applies to `**/*.test.ts`, a CI workflow rule may be repo-wide (leave empty)

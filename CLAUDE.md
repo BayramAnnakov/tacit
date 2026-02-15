@@ -33,7 +33,7 @@ swift build && swift run TacitApp
 cd tacit/backend
 source venv/bin/activate
 python eval_extract.py            # v1: extraction quality vs ground truth
-python eval_v2.py                 # v2: 6 new capability evals (anti-patterns, provenance, path scoping, modular rules, incremental extraction, outcome metrics)
+python eval_v2.py                 # v2: 8 capability evals (anti-patterns, provenance, path scoping, modular rules, incremental, metrics, domain knowledge, ground truth recall)
 python eval_v2.py --skip-extraction  # v2: reuse existing DB, run evals only
 ```
 
@@ -82,9 +82,11 @@ Agents are defined in `agents.py` using `AgentDefinition` dataclass. Each agent 
 
 Tools are defined in `tools.py` using the `@tool` decorator from `claude_agent_sdk`. The `create_tacit_tools_server()` function creates an in-process MCP server. Agents are run via `ClaudeSDKClient` with `ClaudeAgentOptions`.
 
-Current agents (14 total):
+Current agents (16 total):
 - `pr-scanner`, `thread-analyzer`, `structural-analyzer`, `docs-analyzer`, `ci-failure-miner`, `code-analyzer` — extraction pipeline
 - `anti-pattern-miner` — extracts "Do Not" rules from PR review discussions (LLM-classified, not regex-filtered)
+- `domain-analyzer` — discovers domain, product, and design knowledge from README, architecture docs, ADRs, and OpenAPI specs
+- `db-schema-analyzer` — extracts domain knowledge from database schemas, constraints, and sample data
 - `synthesizer`, `generator` — synthesis and monolithic CLAUDE.md output
 - `modular-generator` — produces `.claude/rules/` directory with path-scoped rule files
 - `outcome-analyzer` — collects PR/CI metrics to measure CLAUDE.md effectiveness
@@ -147,6 +149,9 @@ SwiftUI 3-column `NavigationSplitView`. Views connect to backend via `BackendSer
 ### Automation
 - `POST /api/webhook/github` — GitHub webhook for incremental learning (merged PRs → auto-approve high-confidence rules, propose lower-confidence ones)
 
+### Database Analysis
+- `POST /api/analyze-db` — Analyze a database schema to extract domain knowledge (accepts `connection_string`, optional `repo_id`)
+
 ### Proposals
 - `POST /api/proposals` — Create proposal
 - `GET /api/proposals` — List proposals
@@ -172,12 +177,12 @@ SwiftUI 3-column `NavigationSplitView`. Views connect to backend via `BackendSer
 | File | Purpose |
 |------|---------|
 | `tacit/backend/pipeline.py` | Extraction orchestrator (4-phase async pipeline + session mining + incremental extraction + modular generation) |
-| `tacit/backend/agents.py` | Agent definitions (model, tools, prompt mapping) — 14 agents |
-| `tacit/backend/tools.py` | MCP tools (GitHub API, knowledge CRUD, PR diff, anti-patterns, outcome metrics) — 14 tools |
+| `tacit/backend/agents.py` | Agent definitions (model, tools, prompt mapping) — 16 agents |
+| `tacit/backend/tools.py` | MCP tools (GitHub API, knowledge CRUD, PR diff, anti-patterns, outcome metrics, DB introspection) — 20 tools |
 | `tacit/backend/database.py` | SQLite schema, CRUD, feedback scoring, mined sessions |
 | `tacit/backend/main.py` | FastAPI app (REST + WebSocket + webhook + hooks + onboarding) |
 | `tacit/backend/models.py` | Pydantic models (`KnowledgeRule`, `PRValidationResult`, etc.) |
-| `tacit/backend/prompts/` | Agent prompt markdown files (14 prompts) |
+| `tacit/backend/prompts/` | Agent prompt markdown files (16 prompts) |
 | `tacit/backend/hooks/tacit-capture.sh` | Claude Code hook script for live session capture |
 | `tacit/backend/templates/` | GitHub Action template for PR validation |
 | `tacit/backend/samples/` | Sample webhook payload for testing |

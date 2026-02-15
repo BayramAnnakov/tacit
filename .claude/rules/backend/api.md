@@ -22,6 +22,7 @@ paths:
 - **PR validation**: `POST /api/validate-pr`, `POST /api/validate-pr/post-review`
 - **Hooks**: `POST /api/hooks/capture`, `GET /api/hooks/config`, `GET /api/hooks/status`, `POST /api/hooks/install`
 - **Sessions**: `POST /api/mine-sessions`, `GET /api/sessions`
+- **Database analysis**: `POST /api/analyze-db` (schema introspection for domain knowledge)
 - **Onboarding**: `POST /api/onboarding/generate`
 - **Webhook**: `POST /api/webhook/github`
 - **Health**: `GET /api/health`

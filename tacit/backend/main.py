@@ -419,7 +419,7 @@ async def start_extraction(repo_id: int, body: ExtractRequest | None = None):
 async def _extraction_background(repo: str, token: str, run_id: int) -> None:
     """Run extraction in background and broadcast events to WebSocket clients."""
     try:
-        async for event in run_extraction(repo, token):
+        async for event in run_extraction(repo, token, run_id=run_id):
             # Broadcast to all connected WebSocket clients
             await broadcast_event(event)
     except Exception as e:
@@ -519,6 +519,48 @@ async def get_source_quality():
     """Get aggregated quality stats by source type."""
     stats = await db.get_source_quality_stats()
     return {"source_quality": stats}
+
+
+@app.get("/api/stats/discovery/{repo_id}")
+async def get_discovery_stats(repo_id: int):
+    """Headline discovery metrics for a repo — the 'one number' story for demos."""
+    all_rules = await db.list_rules(repo_id=repo_id)
+    total = len(all_rules)
+    if total == 0:
+        return {"total_rules": 0}
+
+    by_source = {}
+    anti_patterns = 0
+    ci_fixes = 0
+    with_provenance = 0
+    with_paths = 0
+    novel_discoveries = 0  # rules NOT from docs source
+
+    for r in all_rules:
+        src = r.get("source_type", "unknown")
+        by_source[src] = by_source.get(src, 0) + 1
+        if src == "anti_pattern":
+            anti_patterns += 1
+        if src == "ci_fix":
+            ci_fixes += 1
+        if r.get("provenance_url"):
+            with_provenance += 1
+        if r.get("applicable_paths"):
+            with_paths += 1
+        if src not in ("docs", "conversation"):
+            novel_discoveries += 1
+
+    return {
+        "total_rules": total,
+        "novel_discoveries": novel_discoveries,
+        "novel_pct": round(novel_discoveries * 100 / total),
+        "anti_patterns": anti_patterns,
+        "ci_fixes": ci_fixes,
+        "provenance_coverage_pct": round(with_provenance * 100 / total),
+        "path_scoping_pct": round(with_paths * 100 / total),
+        "by_source": by_source,
+        "headline": f"{total} rules discovered — {novel_discoveries} from sources not in any docs ({round(novel_discoveries * 100 / total)}% novel)",
+    }
 
 
 # --------------- Proposal Endpoints ---------------
@@ -1504,6 +1546,58 @@ def _generate_onboarding_template(body: OnboardingRequest, rules: list[dict]) ->
     return "\n".join(lines)
 
 
+# --------------- Demo Highlights ---------------
+
+@app.get("/api/demo/highlights/{repo_id}")
+async def get_demo_highlights(repo_id: int, limit: int = Query(5)):
+    """Return the most compelling rules with full provenance for demo.
+
+    Prioritizes anti-pattern and ci_fix sources with valid provenance URLs.
+    """
+    all_rules = await db.list_rules(repo_id=repo_id)
+
+    # Score each rule for demo impact
+    scored = []
+    for r in all_rules:
+        score = 0.0
+        # Anti-patterns and CI fixes are the hero rules
+        if r.get("source_type") == "anti_pattern":
+            score += 3.0
+        elif r.get("source_type") == "ci_fix":
+            score += 2.5
+        # Provenance URL is essential for demo drill-down
+        if r.get("provenance_url"):
+            score += 2.0
+        if r.get("provenance_summary"):
+            score += 1.0
+        # Higher confidence = more compelling
+        score += r.get("confidence", 0.5)
+        # "Do Not" rules are visceral
+        if r.get("rule_text", "").upper().startswith("NEVER"):
+            score += 1.0
+        # Path-scoped rules show sophistication
+        if r.get("applicable_paths"):
+            score += 0.5
+        scored.append((score, r))
+
+    scored.sort(key=lambda x: -x[0])
+    highlights = []
+    for score, r in scored[:limit]:
+        highlights.append({
+            "id": r["id"],
+            "rule_text": r["rule_text"],
+            "category": r.get("category"),
+            "source_type": r.get("source_type"),
+            "confidence": r.get("confidence"),
+            "provenance_url": r.get("provenance_url"),
+            "provenance_summary": r.get("provenance_summary"),
+            "applicable_paths": r.get("applicable_paths"),
+            "demo_score": round(score, 1),
+        })
+
+    return {"repo_id": repo_id, "highlights": highlights, "total_rules": len(all_rules)}
+
+
 # --------------- Health Dashboard ---------------
 
 @app.get("/api/health")
@@ -1550,8 +1644,40 @@ async def health():
         "sessions_mined": len(sessions),
         "hook_installed": hook_installed,
         "hook_script_exists": os.path.isfile(hook_script),
-        "agents": 14,  # 11 original + 3 new
+        "agents": 16,  # 14 original + domain-analyzer + db-schema-analyzer
     }
+
+
+# --------------- Database Schema Analysis ---------------
+
+class DbAnalyzeRequest(BaseModel):
+    connection_string: str
+    repo_id: int | None = None
+
+
+@app.post("/api/analyze-db")
+async def analyze_database(body: DbAnalyzeRequest):
+    """Analyze a database schema to extract domain knowledge."""
+    from pipeline import _run_agent
+
+    repo_id = body.repo_id
+    prompt = (
+        f"Analyze the database schema to extract domain knowledge. "
+        f"Use db_connect with connection_string='{body.connection_string}'. "
+        f"Then use db_inspect_schema and db_sample_data to understand the schema. "
+        f"Extract domain rules using store_knowledge"
+    )
+    if repo_id:
+        prompt += f" with repo_id={repo_id}"
+    prompt += "."
+
+    result = await _run_agent("db-schema-analyzer", prompt, repo_id)
+
+    # Count rules
+    rules = await db.list_rules(repo_id=repo_id) if repo_id else await db.list_rules()
+    domain_rules = [r for r in rules if r.get("category") in ("domain", "design", "product")]
+
+    return {"analyzed": True, "rules_extracted": len(domain_rules)}
 
 
 if __name__ == "__main__":

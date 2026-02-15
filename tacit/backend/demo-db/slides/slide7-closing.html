@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #0D1117; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+  background-image: url('bg-dark.png');
+  background-size: cover;
+}
+.top-bar { height: 4pt; background: #00D4AA; width: 100%; }
+.content {
+  flex: 1; display: flex; flex-direction: column;
+  justify-content: center;
+  padding: 40pt 60pt;
+}
+h2 { color: #00D4AA; font-size: 36pt; margin: 0 0 24pt 0; }
+.feature-list { margin: 0 0 28pt 0; }
+.feature {
+  display: flex; align-items: center; gap: 10pt;
+  margin-bottom: 10pt;
+}
+.check-box {
+  width: 18pt; height: 18pt; min-width: 18pt;
+  background: #00D4AA; border-radius: 4pt;
+  display: flex; align-items: center; justify-content: center;
+}
+.check { color: #0D1117; font-size: 12pt; font-weight: bold; margin: 0; }
+.feature-text { color: #C9D1D9; font-size: 14pt; margin: 0; }
+.bottom-row { display: flex; justify-content: space-between; align-items: center; }
+.tech {
+  display: flex; gap: 10pt;
+}
+.tech-badge {
+  padding: 6pt 12pt;
+  background: rgba(0, 212, 170, 0.08);
+  border: 1px solid rgba(0, 212, 170, 0.2);
+  border-radius: 14pt;
+}
+.tech-text { color: #00D4AA; font-size: 10pt; margin: 0; }
+.credit { color: #8B949E; font-size: 11pt; margin: 0; }
+</style>
+</head>
+<body>
+<div class="top-bar"></div>
+<div class="content">
+  <h2>Tacit: What Your Team Knows</h2>
+  <div class="feature-list">
+    <div class="feature">
+      <div class="check-box"><p class="check">+</p></div>
+      <p class="feature-text">Anti-pattern mining from CHANGES_REQUESTED PR reviews</p>
+    </div>
+    <div class="feature">
+      <div class="check-box"><p class="check">+</p></div>
+      <p class="feature-text">Full provenance: every rule links to the PR where it was learned</p>
+    </div>
+    <div class="feature">
+      <div class="check-box"><p class="check">+</p></div>
+      <p class="feature-text">Native CLAUDE.md + .claude/rules/ output for Claude Code</p>
+    </div>
+    <div class="feature">
+      <div class="check-box"><p class="check">+</p></div>
+      <p class="feature-text">Continuous learning via GitHub webhooks</p>
+    </div>
+    <div class="feature">
+      <div class="check-box"><p class="check">+</p></div>
+      <p class="feature-text">8-eval quality suite scoring 74%</p>
+    </div>
+  </div>
+  <div class="bottom-row">
+    <div class="tech">
+      <div class="tech-badge"><p class="tech-text">Claude Agent SDK</p></div>
+      <div class="tech-badge"><p class="tech-text">MCP Tools</p></div>
+      <div class="tech-badge"><p class="tech-text">16 Agents</p></div>
+      <div class="tech-badge"><p class="tech-text">FastAPI + SwiftUI</p></div>
+    </div>
+    <p class="credit">bayramannakov</p>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,1597 @@
+{
+  "timestamp": "2026-02-13T20:55:55.323013+00:00",
+  "repos": [
+    "langchain-ai/langchain",
+    "denoland/deno",
+    "prisma/prisma",
+    "vercel/next.js",
+    "facebook/react",
+    "anthropics/claude-code",
+    "openclaw/openclaw"
+  ],
+  "overall_score": 0.7102,
+  "evals": [
+    {
+      "name": "Anti-Pattern Mining",
+      "score": 0.7143,
+      "details": {
+        "repos_with_patterns": 5,
+        "total_repos": 7,
+        "avg_patterns_per_repo": 4.0,
+        "total_patterns": 28,
+        "per_repo": {
+          "langchain-ai/langchain": {
+            "patterns_found": 0,
+            "valid_patterns": 0,
+            "sample": []
+          },
+          "denoland/deno": {
+            "patterns_found": 5,
+            "valid_patterns": 5,
+            "sample": [
+              {
+                "pr_number": 31867,
+                "pr_title": "feat(ext/tls): add `SSLKEYLOGFILE` support for TLS key logging",
+                "author": "magurotuna",
+                "merged": true,
+                "has_formal_rejection": false,
+                "review_bodies": [
+                  {
+                    "author": "bartlomieju",
+                    "state": "COMMENTED",
+                    "body": "LGTM, can you update `static ENV_VARS: &[EnvVar]` in `cli/args/flags.rs`?"
+                  }
+                ],
+                "inline_review_comments": [
+                  {
+                    "author": "bartlomieju",
+                    "body": "This env var should be resolved on startup, otherwise someone might use `Deno.env.set(...)` before starting a TLS connection to capture the key",
+                    "path": "ext/tls/keylog.rs",
+                    "diff_hunk": "@@ -0,0 +1,32 @@\n+// Copyright 2018-2026 the Deno authors. MIT license.\n+\n+//! TLS key logging support for debugging encrypted traffic.\n+//!\n+//! When the `SSLKEYLOGFILE` environment variable is set, TLS session keys\n+//! are written to the specified file in NSS Key Log format, which can be\n+//! used by tools like Wireshark to decrypt TLS traffic.\n+\n+use std::env;\n+use std::fs::OpenOptions;\n+use s",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "magurotuna",
+                    "body": "that makes total sense! fixed it [c26dc48](https://github.com/denoland/deno/pull/31867/commits/c26dc48e3c001ee19b83241bd5e7cb336a45c1ac) and added test [fafd2c4](https://github.com/denoland/deno/pull/31867/commits/fafd2c44044954aea47087ca8f80565ba2f40fa7)",
+                    "path": "ext/tls/keylog.rs",
+                    "diff_hunk": "@@ -0,0 +1,32 @@\n+// Copyright 2018-2026 the Deno authors. MIT license.\n+\n+//! TLS key logging support for debugging encrypted traffic.\n+//!\n+//! When the `SSLKEYLOGFILE` environment variable is set, TLS session keys\n+//! are written to the specified file in NSS Key Log format, which can be\n+//! used by tools like Wireshark to decrypt TLS traffic.\n+\n+use std::env;\n+use std::fs::OpenOptions;\n+use s",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "bartlomieju",
+                    "body": "Maybe just for extra safety, let's assert the last path is `keylog.txt` (and not `late_keylog.txt`)",
+                    "path": "tests/specs/run/sslkeylogfile/__test__.jsonc",
+                    "diff_hunk": "@@ -0,0 +1,28 @@\n+{\n+  \"tempDir\": true,\n+  \"tests\": {\n+    \"writes_keylog\": {\n+      \"envs\": { \"SSLKEYLOGFILE\": \"./keylog.txt\" },\n+      \"steps\": [\n+        {\n+          \"args\": \"run --allow-net --allow-env main.ts\",\n+          \"output\": \"[WILDCARD]200[WILDCARD]\"\n+        },\n+        {\n+          \"commandName\": \"cat\",\n+          \"args\": \"keylog.txt\",\n+          \"output\": \"[WILDCARD]CLIENT_HANDSHAK",
+                    "has_suggestion_block": false
+                  }
+                ],
+                "total_review_comments": 3,
+                "review_rounds": 5
+              },
+              {
+                "pr_number": 32137,
+                "pr_title": "tests(node/ext): ignore zlib kmaxlength tests",
+                "author": "fraidev",
+                "merged": true,
+                "has_formal_rejection": false,
+                "review_bodies": [],
+                "inline_review_comments": [
+                  {
+                    "author": "fraidev",
+                    "body": "not sure we want changes here, but this was the hacky solution for that",
+                    "path": "ext/node/polyfills/01_require.js",
+                    "diff_hunk": "@@ -1266,6 +1266,12 @@ function loadNativeModule(_id, request) {\n   }\n   const modExports = nativeModuleExports[request];\n   if (modExports) {\n+    // Match Node.js CJS semantics: when zlib is first require()'d, capture\n+    // buffer.kMaxLength at that point (Node.js does this via\n+    // `const { kMaxLength } = require('buffer')` at module evaluation time).\n+    if (request === \"zlib\") {",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "bartlomieju",
+                    "body": "I think we should mark these errors as ignored and not bother with increased complexity.",
+                    "path": "tests/node_compat/config.jsonc",
+                    "diff_hunk": "",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "fraidev",
+                    "body": "Makes sense, I revert it and ignore them.",
+                    "path": "tests/node_compat/config.jsonc",
+                    "diff_hunk": "",
+                    "has_suggestion_block": false
+                  }
+                ],
+                "total_review_comments": 3,
+                "review_rounds": 4
+              }
+            ]
+          },
+          "prisma/prisma": {
+            "patterns_found": 9,
+            "valid_patterns": 9,
+            "sample": [
+              {
+                "pr_number": 29158,
+                "pr_title": "fix(adapter-mssql): respect curly brace escaping in connection strings",
+                "author": "omair445",
+                "merged": true,
+                "has_formal_rejection": false,
+                "review_bodies": [
+                  {
+                    "author": "coderabbitai[bot]",
+                    "state": "COMMENTED",
+                    "body": "**Actionable comments posted: 1**\n\n> [!CAUTION]\n> Some comments are outside the diff and can\u2019t be posted inline due to platform limitations.\n> \n> \n> \n> <details>\n> <summary>\u26a0\ufe0f Outside diff range comments (1)</summary><blockquote>\n> \n> <details>\n> <summary>packages/adapter-mssql/src/connection-string.ts (1)</summary><blockquote>\n> \n> `34-45`: _\u26a0\ufe0f Potential issue_ | _\ud83d\udfe0 Major_\n> \n> **`extractSchemaFromConnectionString` still uses naive `split(';')` \u2014 same bug the PR fixes elsewhere.**\n> \n> If any o"
+                  },
+                  {
+                    "author": "omair445",
+                    "state": "COMMENTED",
+                    "body": "Thanks for the thorough review @coderabbitai! Both issues addressed:\n\n1. **`extractSchemaFromConnectionString`** \u2014 now uses `splitRespectingBraces()` and `unescapeValue()` for consistency (commit de621d1). Added 5 test cases for escaped schema values.\n\n2. **`braceDepth` negative underflow** \u2014 clamped to prevent going negative on malformed input with unmatched `}` (commit 110a080).\n\nAll 85 tests passing \u2705"
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "state": "COMMENTED",
+                    "body": "**Actionable comments posted: 4**\n\n<!-- This is an auto-generated comment by CodeRabbit for review status -->"
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "state": "COMMENTED",
+                    "body": "**Actionable comments posted: 2**\n\n<!-- This is an auto-generated comment by CodeRabbit for review status -->"
+                  }
+                ],
+                "inline_review_comments": [
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\u26a0\ufe0f Potential issue_ | _\ud83d\udfe1 Minor_\n\n**`braceDepth` can go negative on malformed input with unmatched `}`.**\n\nIf the string contains a stray `}` before any `{`, `braceDepth` becomes negative and subsequent semicolons outside any brace pair won't be treated as delimiters, silently producing incorrect results. Clamp or throw on underflow.\n\n\n<details>\n<summary>Proposed fix</summary>\n\n```diff\n     } else if (char === '}') {\n-      braceDepth--\n+      if (braceDepth > 0) {\n+        braceDepth--\n+      }",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -44,6 +44,61 @@ export function extractSchemaFromConnectionString(connectionString: string): str\n   return undefined\n }\n \n+/**\n+ * Splits a connection string by semicolons while respecting curly brace escaping.\n+ * Values wrapped in curly braces like {value} are treated as literals where\n+ * semicolons and equals signs are not treated as delimiters.\n+ * @param str The string to split\n+ * @retur",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "omair445",
+                    "body": "Good catch! Applied the clamp fix \u2014 `braceDepth` is now guarded against going negative on malformed input with unmatched `}`. Pushed in commit 110a080.",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -44,6 +44,61 @@ export function extractSchemaFromConnectionString(connectionString: string): str\n   return undefined\n }\n \n+/**\n+ * Splits a connection string by semicolons while respecting curly brace escaping.\n+ * Values wrapped in curly braces like {value} are treated as literals where\n+ * semicolons and equals signs are not treated as delimiters.\n+ * @param str The string to split\n+ * @retur",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "`@omair445`, thank you for applying the fix! The guard against negative `braceDepth` will ensure malformed input with unmatched closing braces doesn't cause silent parsing errors. \ud83c\udf89\n\n<!-- <review_comment_addressed> -->\n\n---\n\n<!-- This is an auto-generated comment: tweet message by coderabbit.ai -->\n\nIf you found this review helpful, would you consider giving us a shout-out on [X](https://twitter.com/intent/tweet?related=CodeRabbitAI&text=%40coderabbitai%20spotted%20and%20fixed%20a%20braceDepth%2",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -44,6 +44,61 @@ export function extractSchemaFromConnectionString(connectionString: string): str\n   return undefined\n }\n \n+/**\n+ * Splits a connection string by semicolons while respecting curly brace escaping.\n+ * Values wrapped in curly braces like {value} are treated as literals where\n+ * semicolons and equals signs are not treated as delimiters.\n+ * @param str The string to split\n+ * @retur",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\ud83e\uddf9 Nitpick_ | _\ud83d\udd35 Trivial_\n\n**Good coverage of the core curly-brace escaping scenarios.**\n\nConsider adding edge-case tests for:\n1. Empty braces: `password={}` \u2192 expected `\"\"` (currently broken; see `unescapeValue` comment)\n2. Braces not at value boundaries: `password=my{pass}word` \u2192 expected `my{pass}word` (no unescaping)\n3. Unmatched opening brace: `password={unclosed` \u2192 document expected behavior\n\n<!-- fingerprinting:phantom:medusa:phoenix -->\n\n<!-- This is an auto-generated reply by CodeRabbit",
+                    "path": "packages/adapter-mssql/src/connection-string.test.ts",
+                    "diff_hunk": "@@ -190,6 +190,72 @@ describe('parseConnectionString', () => {\n     })\n   })\n \n+  describe('escaped values with curly braces', () => {\n+    it('should parse password with curly braces correctly', () => {\n+      const connectionString = 'sqlserver://localhost;database=testdb;user=sa;password={mypassword}'\n+      const config = parseConnectionString(connectionString)\n+\n+      expect(config.password)",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\u26a0\ufe0f Potential issue_ | _\ud83d\udfe1 Minor_\n\n**Unclosed `{` silently swallows the rest of the string.**\n\nIf input contains an unmatched `{` (e.g., `password={unclosed;value`), `braceDepth` never returns to 0 and all subsequent semicolons are absorbed into one token. Parameters after the malformed value are silently lost. Consider throwing on `braceDepth !== 0` after the loop, or at minimum adding a test documenting the behavior.\n\n<!-- fingerprinting:phantom:medusa:phoenix -->\n\n<!-- This is an auto-generate",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -33,17 +33,74 @@ const debug = Debug('prisma:driver-adapter:mssql:connection-string')\n  */\n export function extractSchemaFromConnectionString(connectionString: string): string | undefined {\n   const withoutProtocol = connectionString.replace(/^sqlserver:\\/\\//, '')\n-  const parts = withoutProtocol.split(';')\n+  const parts = splitRespectingBraces(withoutProtocol)\n \n   for (const part of parts) {",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\ud83e\uddf9 Nitpick_ | _\ud83d\udd35 Trivial_\n\n**Remove comments that merely describe what the code does.**\n\nLines 71 and 79 restate what the code already makes clear. As per coding guidelines, avoid inline comments that describe what the code does; only write comments explaining *why*.\n\n<details>\n<summary>Suggested diff</summary>\n\n```diff\n     } else if (char === ';' && braceDepth === 0) {\n-      // Only split on semicolon if we're not inside curly braces\n       parts.push(current)\n       current = ''\n     } else ",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -33,17 +33,74 @@ const debug = Debug('prisma:driver-adapter:mssql:connection-string')\n  */\n export function extractSchemaFromConnectionString(connectionString: string): string | undefined {\n   const withoutProtocol = connectionString.replace(/^sqlserver:\\/\\//, '')\n-  const parts = withoutProtocol.split(';')\n+  const parts = splitRespectingBraces(withoutProtocol)\n \n   for (const part of parts) {",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\u26a0\ufe0f Potential issue_ | _\ud83d\udfe1 Minor_\n\n**`{}` (empty braces) is not unescaped due to `length > 2` guard.**\n\nPer MSSQL/JDBC escaping, `password={}` means an empty password. The current `trimmed.length > 2` check returns the literal `{}` instead of an empty string. Use `>= 2` to handle this edge case.\n\n<details>\n<summary>Proposed fix</summary>\n\n```diff\n function unescapeValue(value: string): string {\n   const trimmed = value.trim()\n-  if (trimmed.startsWith('{') && trimmed.endsWith('}') && trimmed.leng",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -33,17 +33,74 @@ const debug = Debug('prisma:driver-adapter:mssql:connection-string')\n  */\n export function extractSchemaFromConnectionString(connectionString: string): string | undefined {\n   const withoutProtocol = connectionString.replace(/^sqlserver:\\/\\//, '')\n-  const parts = withoutProtocol.split(';')\n+  const parts = splitRespectingBraces(withoutProtocol)\n \n   for (const part of parts) {",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "omair445",
+                    "body": "Good catch! Now throwing an error when `braceDepth !== 0` after the loop \u2014 this prevents silent parameter loss from unclosed `{` braces. Added test case for malformed input. Pushed in commit ecfe1df.",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -33,17 +33,74 @@ const debug = Debug('prisma:driver-adapter:mssql:connection-string')\n  */\n export function extractSchemaFromConnectionString(connectionString: string): string | undefined {\n   const withoutProtocol = connectionString.replace(/^sqlserver:\\/\\//, '')\n-  const parts = withoutProtocol.split(';')\n+  const parts = splitRespectingBraces(withoutProtocol)\n \n   for (const part of parts) {",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "omair445",
+                    "body": "Fixed! Changed `length > 2` to `>= 2` so `{}` correctly unescapes to an empty string. Added test case for this edge case. Pushed in commit ecfe1df.",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -33,17 +33,74 @@ const debug = Debug('prisma:driver-adapter:mssql:connection-string')\n  */\n export function extractSchemaFromConnectionString(connectionString: string): string | undefined {\n   const withoutProtocol = connectionString.replace(/^sqlserver:\\/\\//, '')\n-  const parts = withoutProtocol.split(';')\n+  const parts = splitRespectingBraces(withoutProtocol)\n \n   for (const part of parts) {",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "omair445",
+                    "body": "Removed the redundant inline comments. Code is self-explanatory without them. Pushed in commit ecfe1df.",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -33,17 +33,74 @@ const debug = Debug('prisma:driver-adapter:mssql:connection-string')\n  */\n export function extractSchemaFromConnectionString(connectionString: string): string | undefined {\n   const withoutProtocol = connectionString.replace(/^sqlserver:\\/\\//, '')\n-  const parts = withoutProtocol.split(';')\n+  const parts = splitRespectingBraces(withoutProtocol)\n \n   for (const part of parts) {",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "omair445",
+                    "body": "Great suggestions! Added test cases for all three edge cases:\n1. Empty braces `{}` \u2192 empty string\n2. Braces not at boundaries `my{pass}word` \u2192 no unescaping\n3. Unclosed brace `{unclosed` \u2192 throws error with clear message\n\nAlso added tests for unmatched closing brace (clamped behavior). All 91 tests passing \u2705. Pushed in commit ecfe1df.",
+                    "path": "packages/adapter-mssql/src/connection-string.test.ts",
+                    "diff_hunk": "@@ -190,6 +190,72 @@ describe('parseConnectionString', () => {\n     })\n   })\n \n+  describe('escaped values with curly braces', () => {\n+    it('should parse password with curly braces correctly', () => {\n+      const connectionString = 'sqlserver://localhost;database=testdb;user=sa;password={mypassword}'\n+      const config = parseConnectionString(connectionString)\n+\n+      expect(config.password)",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "`@omair445` Thank you for addressing this! The code is indeed cleaner and more maintainable without those descriptive comments.\n\n<!-- <review_comment_addressed> -->\n\n---\n\n<!-- This is an auto-generated comment: tweet message by coderabbit.ai -->\n\nIf you found this review helpful, would you consider giving us a shout-out on [X](https://twitter.com/intent/tweet?related=CodeRabbitAI&text=Cleaner%20code%3A%20%40coderabbitai%20removed%20redundant%20%22what%22%20comments%20(keep%20comments%20for%20the",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -33,17 +33,74 @@ const debug = Debug('prisma:driver-adapter:mssql:connection-string')\n  */\n export function extractSchemaFromConnectionString(connectionString: string): string | undefined {\n   const withoutProtocol = connectionString.replace(/^sqlserver:\\/\\//, '')\n-  const parts = withoutProtocol.split(';')\n+  const parts = splitRespectingBraces(withoutProtocol)\n \n   for (const part of parts) {",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "`@omair445` Thank you for addressing this! The fix looks good, and I appreciate you adding test coverage for the empty braces edge case. This ensures `password={}` is correctly interpreted as an empty password per MSSQL/JDBC escaping rules.\n\n<!-- <review_comment_addressed> -->\n\n---\n\n<!-- This is an auto-generated comment: tweet message by coderabbit.ai -->\n\nIf you found this review helpful, would you consider giving us a shout-out on [X](https://twitter.com/intent/tweet?related=CodeRabbitAI&text",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -33,17 +33,74 @@ const debug = Debug('prisma:driver-adapter:mssql:connection-string')\n  */\n export function extractSchemaFromConnectionString(connectionString: string): string | undefined {\n   const withoutProtocol = connectionString.replace(/^sqlserver:\\/\\//, '')\n-  const parts = withoutProtocol.split(';')\n+  const parts = splitRespectingBraces(withoutProtocol)\n \n   for (const part of parts) {",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "`@omair445` Perfect! The validation looks great \u2014 throwing a clear error message with the `braceDepth` value will make debugging much easier. Thank you for adding the test case as well. This prevents any silent parameter loss and makes the parser more robust. \ud83c\udf89\n\n<!-- <review_comment_addressed> -->\n\n---\n\n<!-- This is an auto-generated comment: tweet message by coderabbit.ai -->\n\nIf you found this review helpful, would you consider giving us a shout-out on [X](https://twitter.com/intent/tweet?rela",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -33,17 +33,74 @@ const debug = Debug('prisma:driver-adapter:mssql:connection-string')\n  */\n export function extractSchemaFromConnectionString(connectionString: string): string | undefined {\n   const withoutProtocol = connectionString.replace(/^sqlserver:\\/\\//, '')\n-  const parts = withoutProtocol.split(';')\n+  const parts = splitRespectingBraces(withoutProtocol)\n \n   for (const part of parts) {",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "`@omair445` Excellent work! \ud83c\udf89 Thanks for implementing all the edge-case tests. The coverage is now comprehensive:\n\n\u2705 Empty braces handling  \n\u2705 Mid-value braces (no unescaping)  \n\u2705 Malformed input validation (unclosed brace throws, unmatched closing brace clamped)\n\nThe test suite now properly validates the brace-aware parsing behavior across both typical and boundary scenarios. Great attention to detail!\n\n<!-- <review_comment_addressed> -->\n\n---\n\n<!-- This is an auto-generated comment: tweet mess",
+                    "path": "packages/adapter-mssql/src/connection-string.test.ts",
+                    "diff_hunk": "@@ -190,6 +190,72 @@ describe('parseConnectionString', () => {\n     })\n   })\n \n+  describe('escaped values with curly braces', () => {\n+    it('should parse password with curly braces correctly', () => {\n+      const connectionString = 'sqlserver://localhost;database=testdb;user=sa;password={mypassword}'\n+      const config = parseConnectionString(connectionString)\n+\n+      expect(config.password)",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\ud83e\uddf9 Nitpick_ | _\ud83d\udd35 Trivial_\n\n**Remove comment that describes what the code does.**\n\nThe function name `splitRespectingBraces` is self-explanatory; the inline comment restates it.\n\n<details>\n<summary>Suggested diff</summary>\n\n```diff\n-  // Split by semicolon while respecting curly brace escaping\n-  const parts = splitRespectingBraces(withoutProtocol)\n+  const parts = splitRespectingBraces(withoutProtocol)\n```\n</details>\n\nAs per coding guidelines: `**/*.{ts,tsx,js,jsx}`: \"Avoid adding useless code c",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -53,8 +110,9 @@ export function extractSchemaFromConnectionString(connectionString: string): str\n export function parseConnectionString(connectionString: string): sql.config {\n   const withoutProtocol = connectionString.replace(/^sqlserver:\\/\\//, '')\n \n-  // Split by semicolon to get key-value pairs\n-  const [hostPart, ...paramParts] = withoutProtocol.split(';')\n+  // Split by semicolon while r",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\ud83e\uddf9 Nitpick_ | _\ud83d\udd35 Trivial_\n\n**Remove comment that describes what the code does.**\n\nThe `valueParts.join('=')` pattern with destructuring is idiomatic for reassembling split values; the comment restates the obvious.\n\n<details>\n<summary>Suggested diff</summary>\n\n```diff\n-    // Join value parts back together (in case there were = signs in the value)\n-    const value = valueParts.join('=')\n+    const value = valueParts.join('=')\n```\n</details>\n\nAs per coding guidelines: `**/*.{ts,tsx,js,jsx}`: \"Do n",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -78,14 +140,16 @@ export function parseConnectionString(connectionString: string): sql.config {\n   const parameters: Record<string, string> = {}\n \n   for (const part of paramParts) {\n-    const [key, value] = part.split('=', 2)\n+    const [key, ...valueParts] = part.split('=')\n     if (!key) continue\n \n     const trimmedKey = key.trim()\n     if (trimmedKey in parameters) {\n       throw new Erro",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "omair445",
+                    "body": "Removed the redundant comment. Code is self-explanatory without it. Pushed in commit 3bc0493.",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -53,8 +110,9 @@ export function extractSchemaFromConnectionString(connectionString: string): str\n export function parseConnectionString(connectionString: string): sql.config {\n   const withoutProtocol = connectionString.replace(/^sqlserver:\\/\\//, '')\n \n-  // Split by semicolon to get key-value pairs\n-  const [hostPart, ...paramParts] = withoutProtocol.split(';')\n+  // Split by semicolon while r",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "omair445",
+                    "body": "Removed the redundant comment. The destructuring + join pattern is idiomatic enough without explanation. Pushed in commit 3bc0493.",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -78,14 +140,16 @@ export function parseConnectionString(connectionString: string): sql.config {\n   const parameters: Record<string, string> = {}\n \n   for (const part of paramParts) {\n-    const [key, value] = part.split('=', 2)\n+    const [key, ...valueParts] = part.split('=')\n     if (!key) continue\n \n     const trimmedKey = key.trim()\n     if (trimmedKey in parameters) {\n       throw new Erro",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "`@omair445` Thank you for addressing this! The code is cleaner without the redundant comment. \ud83c\udf89\n\n<!-- <review_comment_addressed> -->\n\n---\n\n<!-- This is an auto-generated comment: tweet message by coderabbit.ai -->\n\nIf you found this review helpful, would you consider giving us a shout-out on [X](https://twitter.com/intent/tweet?related=CodeRabbitAI&text=Removed%20a%20redundant%20comment%20%E2%80%94%20destructuring%20%2B%20valueParts.join('%3D')%20is%20idiomatic%2C%20so%20the%20code%20is%20cleane",
+                    "path": "packages/adapter-mssql/src/connection-string.ts",
+                    "diff_hunk": "@@ -78,14 +140,16 @@ export function parseConnectionString(connectionString: string): sql.config {\n   const parameters: Record<string, string> = {}\n \n   for (const part of paramParts) {\n-    const [key, value] = part.split('=', 2)\n+    const [key, ...valueParts] = part.split('=')\n     if (!key) continue\n \n     const trimmedKey = key.trim()\n     if (trimmedKey in parameters) {\n       throw new Erro",
+                    "has_suggestion_block": false
+                  }
+                ],
+                "total_review_comments": 37,
+                "review_rounds": 20
+              },
+              {
+                "pr_number": 29038,
+                "pr_title": "feat: query plan caching",
+                "author": "aqrln",
+                "merged": true,
+                "has_formal_rejection": false,
+                "review_bodies": [
+                  {
+                    "author": "coderabbitai[bot]",
+                    "state": "COMMENTED",
+                    "body": "**Actionable comments posted: 24**\n\n> [!CAUTION]\n> Some comments are outside the diff and can\u2019t be posted inline due to platform limitations.\n> \n> \n> \n> <details>\n> <summary>\u26a0\ufe0f Outside diff range comments (1)</summary><blockquote>\n> \n> <details>\n> <summary>packages/client/src/runtime/core/jsonProtocol/serializeJsonQuery.test.ts (1)</summary><blockquote>\n> \n> `49-64`: _\ud83e\uddf9 Nitpick_ | _\ud83d\udd35 Trivial_\n> \n> **Missing test coverage for `wrapRawValues: false` behavior.**\n> \n> The helper hardcodes `wrapRawVa"
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "state": "COMMENTED",
+                    "body": "**Actionable comments posted: 12**\n\n> [!CAUTION]\n> Some comments are outside the diff and can\u2019t be posted inline due to platform limitations.\n> \n> \n> \n> <details>\n> <summary>\u26a0\ufe0f Outside diff range comments (2)</summary><blockquote>\n> \n> <details>\n> <summary>packages/client/src/runtime/core/jsonProtocol/serializeJsonQuery.ts (2)</summary><blockquote>\n> \n> `66-79`: _\u26a0\ufe0f Potential issue_ | _\ud83d\udfe1 Minor_\n> \n> **Add a doc comment for the exported `SerializeParams`.**\n> \n> The exported type lacks a document"
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "state": "COMMENTED",
+                    "body": "**Actionable comments posted: 2**\n\n<!-- This is an auto-generated comment by CodeRabbit for review status -->"
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "state": "COMMENTED",
+                    "body": "**Actionable comments posted: 6**\n\n<!-- This is an auto-generated comment by CodeRabbit for review status -->"
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "state": "COMMENTED",
+                    "body": "**Actionable comments posted: 10**\n\n<!-- This is an auto-generated comment by CodeRabbit for review status -->"
+                  }
+                ],
+                "inline_review_comments": [
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\u26a0\ufe0f Potential issue_ | _\ud83d\udfe1 Minor_\n\n**Remove redundant doc comments on non-exported helpers.**\n\nThese blocks restate the function names/behavior without adding context; please drop them or replace with rationale-oriented notes.  \n\n\n<details>\n<summary>\ud83e\uddf9 Suggested cleanup</summary>\n\n```diff\n-/**\n- * Checks if a value is a placeholder.\n- * Handles both formats: `{ $type: 'Param', value: { name: '...' } }` and `{ prisma__type: 'param', prisma__value: { name: '...' } }`\n- */\n function isPlaceholder(\n  ",
+                    "path": "packages/client-engine-runtime/src/batch.ts",
+                    "diff_hunk": "@@ -19,11 +19,69 @@ export type CompactedBatchResponse = {\n   expectNonEmpty: boolean\n }\n \n+/**\n+ * Checks if a value is a placeholder.\n+ * Handles both formats: `{ $type: 'Param', value: { name: '...' } }` and `{ prisma__type: 'param', prisma__value: { name: '...' } }`\n+ */\n+function isPlaceholder(\n+  value: unknown,\n+): value is { $type: 'Param'; value: { name: string } } | { prisma__type: 'para",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\u26a0\ufe0f Potential issue_ | _\ud83d\udfe1 Minor_\n\n**Guard against malformed placeholder shapes.**\n\n`isPlaceholder` accepts any object with `$type: 'Param'`, but `getPlaceholderName` assumes `value.value` exists; malformed inputs can throw. Prefer defensive checks or optional chaining.  \n\n\n<details>\n<summary>\ud83d\udee1\ufe0f Suggested hardening</summary>\n\n```diff\n function getPlaceholderName(\n   value: { $type: 'Param'; value: { name: string } } | { prisma__type: 'param'; prisma__value: { name: string } },\n ): string | undefi",
+                    "path": "packages/client-engine-runtime/src/batch.ts",
+                    "diff_hunk": "@@ -19,11 +19,69 @@ export type CompactedBatchResponse = {\n   expectNonEmpty: boolean\n }\n \n+/**\n+ * Checks if a value is a placeholder.\n+ * Handles both formats: `{ $type: 'Param', value: { name: '...' } }` and `{ prisma__type: 'param', prisma__value: { name: '...' } }`\n+ */\n+function isPlaceholder(\n+  value: unknown,\n+): value is { $type: 'Param'; value: { name: string } } | { prisma__type: 'para",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\u26a0\ufe0f Potential issue_ | _\ud83d\udfe0 Major_\n\n**Resolve placeholders recursively (nested args will mismatch).**\n\n`resolveArgPlaceholders` only handles top-level keys. Placeholders nested inside objects/arrays (common in Prisma filters) remain unresolved, causing `doKeysMatch` to miss rows and return null/P2025 incorrectly.  \n\n\n<details>\n<summary>\u2705 Suggested recursive resolution</summary>\n\n```diff\n function resolveArgPlaceholders(\n   args: Record<string, {}>,\n   placeholderValues: Record<string, unknown>,\n )",
+                    "path": "packages/client-engine-runtime/src/batch.ts",
+                    "diff_hunk": "@@ -19,11 +19,69 @@ export type CompactedBatchResponse = {\n   expectNonEmpty: boolean\n }\n \n+/**\n+ * Checks if a value is a placeholder.\n+ * Handles both formats: `{ $type: 'Param', value: { name: '...' } }` and `{ prisma__type: 'param', prisma__value: { name: '...' } }`\n+ */\n+function isPlaceholder(\n+  value: unknown,\n+): value is { $type: 'Param'; value: { name: string } } | { prisma__type: 'para",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\u26a0\ufe0f Potential issue_ | _\ud83d\udfe1 Minor_\n\n**Drop the redundant inline comment.**\n\nThe comment restates the next line; remove or replace with rationale if there\u2019s nuance.  \n\n\n<details>\n<summary>\ud83e\uddf9 Suggested cleanup</summary>\n\n```diff\n-    // Resolve any placeholders in the args using the provided placeholder values\n     const resolvedArgs = resolveArgPlaceholders(args, placeholderValues)\n```\n</details>\n\nAs per coding guidelines, \"Avoid adding useless code comments that do not add new information. Do not w",
+                    "path": "packages/client-engine-runtime/src/batch.ts",
+                    "diff_hunk": "@@ -36,9 +94,12 @@ export function convertCompactedRows(rows: {}[], compiledBatch: CompactedBatchRe\n   const selection = new Set(compiledBatch.nestedSelection)\n \n   return compiledBatch.arguments.map((args) => {\n+    // Resolve any placeholders in the args using the provided placeholder values\n+    const resolvedArgs = resolveArgPlaceholders(args, placeholderValues)\n+",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\ud83e\uddf9 Nitpick_ | _\ud83d\udd35 Trivial_\n\n**Consider using JSON.stringify for the graph value to ensure safe string escaping.**\n\nWhile `serialized.graph` is likely a base64-encoded string (safe for direct interpolation), using `JSON.stringify` would be more defensive against edge cases where the graph might contain characters that need escaping (e.g., `\"`, `\\`, or newlines).\n\n\n<details>\n<summary>Proposed fix</summary>\n\n```diff\n   private buildParamGraphConfig(): string {\n     const serialized = buildAndSeriali",
+                    "path": "packages/client-generator-js/src/TSClient/TSClient.ts",
+                    "diff_hunk": "@@ -47,14 +48,23 @@ export class TSClient implements Generable {\n     this.genericsInfo = new GenericArgsInfo(this.dmmf)\n   }\n \n+  private buildParamGraphConfig(): string {\n+    const serialized = buildAndSerializeParamGraph(this.options.dmmf)\n+    const stringsJson = JSON.stringify(JSON.stringify(serialized.strings))\n+    return `config.parameterizationSchema = {\n+  strings: JSON.parse(${stringsJ",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\ud83e\uddf9 Nitpick_ | _\ud83d\udd35 Trivial_\n\n**Same string escaping concern and potential code duplication.**\n\n1. Like in `TSClient.ts`, consider using `JSON.stringify(serialized.graph)` instead of direct interpolation for defensive escaping.\n\n2. This function is nearly identical to `buildParamGraphConfig` in `packages/client-generator-js/src/TSClient/TSClient.ts`. Consider extracting this into a shared utility to reduce duplication between the JS and TS client generators.\n\n\n<details>\n<summary>Proposed fix for es",
+                    "path": "packages/client-generator-ts/src/TSClient/file-generators/ClassFile.ts",
+                    "diff_hunk": "@@ -60,12 +63,23 @@ function clientConfig(context: GenerateContext, options: TSClientOptions) {\n     activeProvider: options.activeProvider,\n     inlineSchema,\n     runtimeDataModel: { models: {}, enums: {}, types: {} },\n+    parameterizationSchema: { strings: [], graph: '' },\n   }\n \n   return `\n const config: runtime.GetPrismaClientConfig = ${JSON.stringify(config, null, 2)}\n ${buildRuntimeDataMo",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\u26a0\ufe0f Potential issue_ | _\ud83d\udfe1 Minor_\n\n**Add a doc comment for the exported helper.**\n\nThis exported function needs a proper documentation comment.  \n\n\n<details>\n<summary>\ud83d\udcdd Suggested doc comment</summary>\n\n```diff\n+/**\n+ * Loads the Wasm QueryCompiler for the given provider for benchmark runs.\n+ */\n export function loadQueryCompiler(provider: string): Promise<QueryCompilerConstructor> {\n```\n</details>\n\nAs per coding guidelines, \u201cWrite documentation comments for exported items using proper doc comment",
+                    "path": "packages/client/src/__tests__/benchmarks/query-performance/qc-loader.ts",
+                    "diff_hunk": "@@ -0,0 +1,38 @@\n+import fs from 'node:fs'\n+import path from 'node:path'\n+\n+import { QueryCompilerConstructor } from '@prisma/client-common'\n+\n+import { wasmQueryCompilerLoader } from '../../../runtime/core/engines/client/WasmQueryCompilerLoader'\n+\n+export function loadQueryCompiler(provider: string): Promise<QueryCompilerConstructor> {\n+  const runtimeBase = path.join(__dirname, '..', '..', '..',",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\ud83e\uddf9 Nitpick_ | _\ud83d\udd35 Trivial_\n\n**TODO comment should be tracked.**\n\nLine 105-106 contains a `// todo: remove this` comment. Consider creating an issue to track this cleanup or add more context about when/why it should be removed.\n\n<!-- fingerprinting:phantom:medusa:ocelot -->\n\n<!-- This is an auto-generated comment by CodeRabbit -->",
+                    "path": "packages/client/src/runtime/core/engines/client/ClientEngine.ts",
+                    "diff_hunk": "@@ -98,6 +101,10 @@ export class ClientEngine implements Engine {\n   #state: EngineState = { type: 'disconnected' }\n   #queryCompilerLoader: QueryCompilerLoader\n   #executorKind: ExecutorKind\n+  #queryPlanCache: QueryPlanCache\n+  // todo: remove this\n+  #queryPlanCacheEnabled: boolean\n+  #paramGraph: ParamGraph",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\ud83e\uddf9 Nitpick_ | _\ud83d\udd35 Trivial_\n\n**Raw query detection via `modelName === undefined` may be fragile.**\n\nConsider using the `isRawQuery` helper (defined at line 756) for consistency with the single-query path.\n\n\n<details>\n<summary>\u267b\ufe0f Use isRawQuery helper for consistency</summary>\n\n```diff\n-    const hasRawQueries = firstModelName === undefined\n+    const hasRawQueries = queries.some(isRawQuery)\n```\n</details>\n\n<!-- suggestion_start -->\n\n<details>\n<summary>\ud83d\udcdd Committable suggestion</summary>\n\n> \u203c\ufe0f **IMP",
+                    "path": "packages/client/src/runtime/core/engines/client/ClientEngine.ts",
+                    "diff_hunk": "@@ -493,13 +529,41 @@ export class ClientEngine implements Engine {\n     const firstAction = queries[0].action\n     const firstModelName = queries[0].modelName\n \n-    const request = getBatchRequestPayload(queries, transaction)\n+    const batchPayload = getBatchRequestPayload(queries, transaction)\n+    const request = JSON.stringify(batchPayload)\n \n     const { executor, queryCompiler } = await th",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\ud83e\uddf9 Nitpick_ | _\ud83d\udd35 Trivial_\n\n**Mutable `export let` with async initialization is error-prone.**\n\nThe `export let paramGraph` pattern combined with eager async initialization creates a race condition window. If a test imports this module and synchronously accesses `paramGraph` before `initPromise` resolves, it will be `undefined`.\n\nConsider making the access safer:\n\n\n<details>\n<summary>\u267b\ufe0f Safer pattern using getter or required await</summary>\n\n**Option 1: Getter that throws if not initialized**\n```",
+                    "path": "packages/client/src/runtime/core/engines/client/parameterization/parameterize-tests/test-fixtures.ts",
+                    "diff_hunk": "@@ -0,0 +1,117 @@\n+import type { RuntimeDataModel } from '@prisma/client-common'\n+import { getDMMF } from '@prisma/client-generator-js'\n+import { ParamGraph } from '@prisma/param-graph'\n+import { buildAndSerializeParamGraph } from '@prisma/param-graph-builder'\n+\n+/**\n+ * Prisma schema that simulates a User model with common fields and filters,\n+ * along with related Post and Profile models.\n+ */\n+",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\ud83e\uddf9 Nitpick_ | _\ud83d\udd35 Trivial_\n\n**Eager initialization has unhandled rejection risk.**\n\nThe `initializeFixtures()` promise is created at module load, but if it rejects, the error may be swallowed unless a test explicitly awaits `initPromise`. Consider adding error handling:\n\n\n<details>\n<summary>\u267b\ufe0f Add error handling for eager init</summary>\n\n```diff\n const initPromise = initializeFixtures().then((pg) => {\n   paramGraph = pg\n+}).catch((err) => {\n+  console.error('Failed to initialize test fixtures:', ",
+                    "path": "packages/client/src/runtime/core/engines/client/parameterization/parameterize-tests/test-fixtures.ts",
+                    "diff_hunk": "@@ -0,0 +1,117 @@\n+import type { RuntimeDataModel } from '@prisma/client-common'\n+import { getDMMF } from '@prisma/client-generator-js'\n+import { ParamGraph } from '@prisma/param-graph'\n+import { buildAndSerializeParamGraph } from '@prisma/param-graph-builder'\n+\n+/**\n+ * Prisma schema that simulates a User model with common fields and filters,\n+ * along with related Post and Profile models.\n+ */\n+",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\ud83e\uddf9 Nitpick_ | _\ud83d\udd35 Trivial_\n\n**Consider documenting the custom action type cast.**\n\nThe `as any` cast for `'findByDate'` action works for testing, but a brief comment explaining this is a test-only synthetic action would improve clarity.\n\n```diff\n       const query: JsonQuery = {\n         modelName: 'User',\n-        action: 'findByDate' as any,\n+        action: 'findByDate' as any, // Synthetic action for testing DateTime parameterization\n         query: {\n```\n\n<!-- suggestion_start -->\n\n<details>",
+                    "path": "packages/client/src/runtime/core/engines/client/parameterization/parameterize.test.ts",
+                    "diff_hunk": "@@ -0,0 +1,687 @@\n+import type { RuntimeDataModel } from '@prisma/client-common'\n+import type { JsonQuery } from '@prisma/json-protocol'\n+import type { ParamGraphData } from '@prisma/param-graph'\n+import { EdgeFlag, ParamGraph, ScalarMask } from '@prisma/param-graph'\n+\n+import { parameterizeBatch, parameterizeQuery } from './parameterize'\n+\n+function createEnumLookup(runtimeDataModel: RuntimeDataM",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\u26a0\ufe0f Potential issue_ | _\ud83d\udfe1 Minor_\n\n**Rename test file to kebab-case.**  \n`QueryPlanCache.test.ts` should be kebab-case (e.g., `query-plan-cache.test.ts`).  \n  \nAs per coding guidelines: Use kebab-case for new file names (e.g., `query-utils.ts`, `filter-operators.test.ts`).\n\n<!-- fingerprinting:phantom:poseidon:eagle -->\n\n<!-- This is an auto-generated comment by CodeRabbit -->",
+                    "path": "packages/client/src/runtime/core/engines/client/QueryPlanCache.test.ts",
+                    "diff_hunk": "@@ -0,0 +1,201 @@\n+import { QueryPlanCache } from './QueryPlanCache'",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\u26a0\ufe0f Potential issue_ | _\ud83d\udfe1 Minor_\n\n**Remove inline \u201cwhat it does\u201d comments.**  \nThe two inline comments restate the code.  \n  \n<details>\n<summary>\ud83e\uddf9 Suggested cleanup</summary>\n\n```diff\n-      // Access key1 to make it recently used\n       cache.getSingle('key1')\n\n-      // Add key3, should evict key2 (oldest)\n       cache.setSingle('key3', plan3)\n```\n</details>  \nAs per coding guidelines: Avoid adding useless code comments that do not add new information. Do not write inline comments that describ",
+                    "path": "packages/client/src/runtime/core/engines/client/query-plan-cache.test.ts",
+                    "diff_hunk": "@@ -0,0 +1,201 @@\n+import { QueryPlanCache } from './QueryPlanCache'\n+\n+describe('QueryPlanCache', () => {\n+  describe('single cache', () => {\n+    it('stores and retrieves entries', () => {\n+      const cache = new QueryPlanCache()\n+      const plan = { type: 'value' as const, args: null }\n+\n+      cache.setSingle('key1', plan)\n+      const retrieved = cache.getSingle('key1')\n+\n+      expect(retr",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\u26a0\ufe0f Potential issue_ | _\ud83d\udfe1 Minor_\n\n**Remove inline \u201cwhat it does\u201d comments.**  \nThe two inline comments restate the code.  \n  \n<details>\n<summary>\ud83e\uddf9 Suggested cleanup</summary>\n\n```diff\n-      // Access key1 to make it recently used\n       cache.getBatch('key1')\n\n-      // Add key3, should evict key2 (oldest)\n       cache.setBatch('key3', makeResponse(3))\n```\n</details>  \nAs per coding guidelines: Avoid adding useless code comments that do not add new information. Do not write inline comments that",
+                    "path": "packages/client/src/runtime/core/engines/client/query-plan-cache.test.ts",
+                    "diff_hunk": "@@ -0,0 +1,201 @@\n+import { QueryPlanCache } from './QueryPlanCache'\n+\n+describe('QueryPlanCache', () => {\n+  describe('single cache', () => {\n+    it('stores and retrieves entries', () => {\n+      const cache = new QueryPlanCache()\n+      const plan = { type: 'value' as const, args: null }\n+\n+      cache.setSingle('key1', plan)\n+      const retrieved = cache.getSingle('key1')\n+\n+      expect(retr",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\ud83e\uddf9 Nitpick_ | _\ud83d\udd35 Trivial_\n\n**TODO: Performance optimization for bytes conversion.**\n\nThe current implementation converts the ArrayBuffer view to a Buffer before base64 encoding.\n\n\nWould you like me to open an issue to track this performance optimization? Potential approaches include using `btoa` with a typed array view or a direct base64 encoding library that avoids the intermediate Buffer allocation.\n\n<!-- fingerprinting:phantom:poseidon:ocelot -->\n\n<!-- This is an auto-generated comment by Cod",
+                    "path": "packages/client/src/runtime/core/jsonProtocol/serializeJsonQuery.ts",
+                    "diff_hunk": "@@ -309,6 +312,7 @@ function serializeArgumentsValue(\n \n   if (ArrayBuffer.isView(jsValue)) {\n     const { buffer, byteOffset, byteLength } = jsValue\n+    // TODO(perf): get rid of this conversion\n     return { $type: 'Bytes', value: Buffer.from(buffer, byteOffset, byteLength).toString('base64') }\n   }",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\u26a0\ufe0f Potential issue_ | _\ud83d\udfe0 Major_\n\n**Add teardown for per-test Prisma clients.**\n\nLine 62-64 now creates a new Prisma client per test but never disconnects prior instances, which can leak connections and keep open handles across the suite. Add an `afterEach` to disconnect (or reuse a single client).\n\n\n<details>\n<summary>\ud83e\uddf9 Proposed fix</summary>\n\n```diff\n beforeEach(() => {\n   prisma = newPrismaClient()\n })\n+\n+afterEach(async () => {\n+  await prisma.$disconnect()\n+})\n```\n</details>\n\n<!-- suggestio",
+                    "path": "packages/client/tests/functional/tracing/tests.ts",
+                    "diff_hunk": "@@ -59,6 +59,10 @@ afterAll(() => {\n   context.disable()\n })\n \n+beforeEach(() => {\n+  prisma = newPrismaClient()\n+})",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\ud83e\uddf9 Nitpick_ | _\ud83d\udd35 Trivial_\n\n**Add documentation comments for exported types.**\n\nThe new `Placeholder` and `PlaceholderType` types are public exports but lack documentation comments. As per coding guidelines, exported items should have proper doc comments.\n\n<details>\n<summary>\ud83d\udcdd Suggested documentation</summary>\n\n```diff\n+/**\n+ * Represents a placeholder in a parameterized query.\n+ * Combines a unique name with type information for runtime value binding.\n+ */\n export type Placeholder = {\n   name: s",
+                    "path": "packages/json-protocol/src/index.ts",
+                    "diff_hunk": "@@ -84,10 +85,29 @@ export type JsonInputTaggedValue =\n   | JsonTaggedValue\n   | EnumTaggedValue\n   | RawTaggedValue\n+  | PlaceholderTaggedValue\n \n export type JsonOutputTaggedValue =\n   | DateTaggedValue\n   | DecimalTaggedValue\n   | BytesTaggedValue\n   | BigIntTaggedValue\n   | JsonTaggedValue\n+\n+export type Placeholder = {\n+  name: string\n+} & PlaceholderType\n+\n+export type PlaceholderType =\n+  |",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\ud83e\uddf9 Nitpick_ | _\ud83d\udd35 Trivial_\n\n<details>\n<summary>\ud83e\udde9 Analysis chain</summary>\n\n\ud83c\udfc1 Script executed:\n\n```shell\n#!/bin/bash\n\n# Check for test files in param-graph-builder\necho \"=== Test files in param-graph-builder ===\"\nfind packages/param-graph-builder -type f \\( -name \"*.test.ts\" -o -name \"*.test.js\" -o -name \"*.spec.ts\" -o -name \"*.spec.js\" \\) 2>/dev/null || echo \"No test files found\"\n\necho \"\"\necho \"=== param-graph-builder package.json scripts ===\"\ncat packages/param-graph-builder/package.json | grep ",
+                    "path": "packages/param-graph-builder/package.json",
+                    "diff_hunk": "@@ -0,0 +1,39 @@\n+{\n+  \"name\": \"@prisma/param-graph-builder\",\n+  \"version\": \"0.0.0\",\n+  \"description\": \"This package is intended for Prisma's internal use\",\n+  \"main\": \"dist/index.js\",\n+  \"module\": \"dist/index.mjs\",\n+  \"types\": \"dist/index.d.ts\",\n+  \"exports\": {\n+    \".\": {\n+      \"require\": {\n+        \"types\": \"./dist/index.d.ts\",\n+        \"default\": \"./dist/index.js\"\n+      },\n+      \"import\": {",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "coderabbitai[bot]",
+                    "body": "_\u26a0\ufe0f Potential issue_ | _\ud83d\udfe1 Minor_\n\n<details>\n<summary>\ud83e\udde9 Analysis chain</summary>\n\n\ud83c\udfc1 Script executed:\n\n```shell\ncat -n packages/param-graph-builder/src/dmmf-traverser.ts | sed -n '380,440p'\n```\n\nRepository: prisma/prisma\n\nLength of output: 2179\n\n---\n\n\ud83c\udfc1 Script executed:\n\n```shell\nrg -n 'buildInputTypeNode|#pendingInputNodes' packages/param-graph-builder/src/dmmf-traverser.ts -B 2 -A 10\n```\n\nRepository: prisma/prisma\n\nLength of output: 2617\n\n---\n\n\ud83c\udfc1 Script executed:\n\n```shell\nrg -n '#drainPendingWork",
+                    "path": "packages/param-graph-builder/src/dmmf-traverser.ts",
+                    "diff_hunk": "@@ -0,0 +1,453 @@\n+/**\n+ * DMMFTraverser: DMMF traversal logic for building ParamGraph.\n+ *\n+ * This class contains the traversal algorithms that walk DMMF structures\n+ * and build the param graph. It uses ParamGraphBuilder for allocation\n+ * and caching.\n+ */\n+\n+import type * as DMMF from '@prisma/dmmf'\n+import { ModelAction } from '@prisma/dmmf'\n+import type { InputEdgeData, OutputEdgeData } fro",
+                    "has_suggestion_block": false
+                  }
+                ],
+                "total_review_comments": 50,
+                "review_rounds": 20
+              }
+            ]
+          },
+          "vercel/next.js": {
+            "patterns_found": 4,
+            "valid_patterns": 4,
+            "sample": [
+              {
+                "pr_number": 89874,
+                "pr_title": "Turbopack: Use `std::any::type_name` for global naming of turbo-task items",
+                "author": "bgw",
+                "merged": true,
+                "has_formal_rejection": false,
+                "review_bodies": [],
+                "inline_review_comments": [
+                  {
+                    "author": "vercel[bot]",
+                    "body": "```suggestion\n                AtomicBool::store(&ONLY_RUN_ONCE, true, Ordering::Release);\n```\n\nThe `ONLY_RUN_ONCE` debug guard in the `global_name!` macro stores `false` instead of `true`, making it never detect duplicate invocations.\n<!-- VADE-CATEGORY: logic -->\n<!-- VADE-GITHUB-SUGGESTION-ID:8eebfb8ac2a30f2e1215a4fe741ce3d7e80c546ce36c5d24339c209fa95adc55 -->\n\n<!-- VADE-RECOMMENDATION: SUGGESTION -->\n<a href=\"https://vercel.com/vercel/~/agent/tasks/62007183-7e29-40c0-98dd-cf551ae92af0#suggest",
+                    "path": "turbopack/crates/turbo-tasks/src/macro_helpers.rs",
+                    "diff_hunk": "@@ -193,21 +198,37 @@ macro_rules! inventory_submit {\n #[doc(hidden)]\n pub use inventory::submit as inventory_submit_inner;\n \n-/// Define a global name for a turbo-tasks value.\n-#[cfg(not(rust_analyzer))] // ignore-rust-analyzer due to https://github.com/rust-lang/rust-analyzer/issues/19993\n-#[macro_export]\n-macro_rules! global_name {\n-    ($($item:tt)*) => {\n-\n-        ::std::concat!(::std::env!(",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "vercel[bot]",
+                    "body": "```suggestion\n\n```\n\nDebug `eprintln!(\"{}\", value_name)` statement left in production code prints every trait method's value name to stderr during initialization.\n<!-- VADE-CATEGORY: code-style -->\n<!-- VADE-GITHUB-SUGGESTION-ID:8c47c0512c2bce95cfeaa4c6fca37f69010b1566198a5fb499ba2c732f4bc60a -->\n\n<!-- VADE-RECOMMENDATION: SUGGESTION -->\n<a href=\"https://vercel.com/vercel/~/agent/tasks/62007183-7e29-40c0-98dd-cf551ae92af0#suggestion-8c47c0512c2bce95cfeaa4c6fca37f69010b1566198a5fb499ba2c732f4bc60a",
+                    "path": "turbopack/crates/turbo-tasks/src/macro_helpers.rs",
+                    "diff_hunk": "@@ -142,32 +142,37 @@ inventory::collect! {CollectableTraitCastFunctions}\n \n #[allow(clippy::type_complexity)]\n pub struct CollectableTraitMethods(\n-    // A value type name\n-    pub &'static str,\n-    pub fn() -> (TraitTypeId, Vec<(&'static str, &'static NativeFunction)>),\n+    pub  fn() -> (\n+        &'static str, // A value type name\n+        TraitTypeId,\n+        Vec<(&'static str, &'static Na",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "vercel[bot]",
+                    "body": "The bug has been fixed in a new commit. Line 219 now correctly stores `true` via `AtomicBool::store(&ONLY_RUN_ONCE, true, Ordering::Release)`. The macro was also renamed to `global_name_for_scope`.",
+                    "path": "turbopack/crates/turbo-tasks/src/macro_helpers.rs",
+                    "diff_hunk": "@@ -193,21 +198,37 @@ macro_rules! inventory_submit {\n #[doc(hidden)]\n pub use inventory::submit as inventory_submit_inner;\n \n-/// Define a global name for a turbo-tasks value.\n-#[cfg(not(rust_analyzer))] // ignore-rust-analyzer due to https://github.com/rust-lang/rust-analyzer/issues/19993\n-#[macro_export]\n-macro_rules! global_name {\n-    ($($item:tt)*) => {\n-\n-        ::std::concat!(::std::env!(",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "vercel[bot]",
+                    "body": "The `eprintln!(\"{}\", value_name)` debug statement has been removed from `turbopack/crates/turbo-tasks/src/macro_helpers.rs` by a subsequent commit.",
+                    "path": "turbopack/crates/turbo-tasks/src/macro_helpers.rs",
+                    "diff_hunk": "@@ -142,32 +142,37 @@ inventory::collect! {CollectableTraitCastFunctions}\n \n #[allow(clippy::type_complexity)]\n pub struct CollectableTraitMethods(\n-    // A value type name\n-    pub &'static str,\n-    pub fn() -> (TraitTypeId, Vec<(&'static str, &'static NativeFunction)>),\n+    pub  fn() -> (\n+        &'static str, // A value type name\n+        TraitTypeId,\n+        Vec<(&'static str, &'static Na",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "bgw",
+                    "body": "Possible follow-up: We should be able to use `std::any::TypeId` for registering trait methods.",
+                    "path": "turbopack/crates/turbo-tasks-macros/src/value_impl_macro.rs",
+                    "diff_hunk": "@@ -307,9 +303,11 @@ pub fn value_impl(args: TokenStream, input: TokenStream) -> TokenStream {\n             // 4.VTableRegistries (requires ValueTypeIds)\n             turbo_tasks::macro_helpers::inventory_submit!{\n                 turbo_tasks::macro_helpers::CollectableTraitMethods(\n-                    #value_name,\n-                    || (<::std::boxed::Box<dyn #trait_path> as turbo_tasks::VcVal",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "mmastrac",
+                    "body": "```suggestion\n    pub fn() -> (\n```",
+                    "path": "turbopack/crates/turbo-tasks/src/macro_helpers.rs",
+                    "diff_hunk": "@@ -142,32 +143,36 @@ inventory::collect! {CollectableTraitCastFunctions}\n \n #[allow(clippy::type_complexity)]\n pub struct CollectableTraitMethods(\n-    // A value type name\n-    pub &'static str,\n-    pub fn() -> (TraitTypeId, Vec<(&'static str, &'static NativeFunction)>),\n+    pub  fn() -> (",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "mmastrac",
+                    "body": "```suggestion\n            assert!(!AtomicBool::swap(&ONLY_RUN_ONCE, true, Ordering::AcqRel));\n```",
+                    "path": "turbopack/crates/turbo-tasks/src/macro_helpers.rs",
+                    "diff_hunk": "@@ -193,21 +199,99 @@ macro_rules! inventory_submit {\n #[doc(hidden)]\n pub use inventory::submit as inventory_submit_inner;\n \n-/// Define a global name for a turbo-tasks value.\n-#[cfg(not(rust_analyzer))] // ignore-rust-analyzer due to https://github.com/rust-lang/rust-analyzer/issues/19993\n+#[doc(hidden)]\n #[macro_export]\n-macro_rules! global_name {\n-    ($($item:tt)*) => {\n+macro_rules! debug_as",
+                    "has_suggestion_block": true
+                  },
+                  {
+                    "author": "lukesandberg",
+                    "body": "why did these change?",
+                    "path": "turbopack/crates/turbo-tasks-backend/tests/task_statistics.rs",
+                    "diff_hunk": "@@ -186,23 +186,23 @@ async fn test_no_execution() -> Result<()> {\n         assert_eq!(\n             stats_json(),\n             json!({\n-                \"WrappedU64::Doublable::double\": {\n+                \"<task_statistics::WrappedU64 as dyn task_statistics::Doublable>::double\": {\n                     \"cache_hit\": 0,\n                     \"cache_miss\": 1\n                 },\n-                \"Wrappe",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "lukesandberg",
+                    "body": "can you document the 2 this seems likely to break\n\n1 because it is a closure callback for the lazy static item?  but what is the other one?\n\ncould we defer this until `definition` is called?",
+                    "path": "turbopack/crates/turbo-tasks-macros/src/function_macro.rs",
+                    "diff_hunk": "@@ -55,11 +55,10 @@ pub fn function(args: TokenStream, input: TokenStream) -> TokenStream {\n     let inline_function_ident = turbo_fn.inline_ident();\n     let (inline_signature, inline_block) = turbo_fn.inline_signature_and_block(&block);\n     let inline_attrs = filter_inline_attributes(&attrs[..]);\n-    let function_path_string = ident.to_string();\n \n     let native_fn = NativeFn {\n-        funct",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "bgw",
+                    "body": "Yeah, it's the closure and the lazy static item itself. I'll document it.",
+                    "path": "turbopack/crates/turbo-tasks-macros/src/function_macro.rs",
+                    "diff_hunk": "@@ -55,11 +55,10 @@ pub fn function(args: TokenStream, input: TokenStream) -> TokenStream {\n     let inline_function_ident = turbo_fn.inline_ident();\n     let (inline_signature, inline_block) = turbo_fn.inline_signature_and_block(&block);\n     let inline_attrs = filter_inline_attributes(&attrs[..]);\n-    let function_path_string = ident.to_string();\n \n     let native_fn = NativeFn {\n-        funct",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "bgw",
+                    "body": "- `module_path` didn't include the crate name\n- We had some logic to strip off the stuff before the `@` symbol in the old naming convention, as that's where the crate hash placeholder used to go. That's also where the crate name used to be. I'll clean that up.",
+                    "path": "turbopack/crates/turbo-tasks-backend/tests/task_statistics.rs",
+                    "diff_hunk": "@@ -186,23 +186,23 @@ async fn test_no_execution() -> Result<()> {\n         assert_eq!(\n             stats_json(),\n             json!({\n-                \"WrappedU64::Doublable::double\": {\n+                \"<task_statistics::WrappedU64 as dyn task_statistics::Doublable>::double\": {\n                     \"cache_hit\": 0,\n                     \"cache_miss\": 1\n                 },\n-                \"Wrappe",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "lukesandberg",
+                    "body": "ah the item itself counts.... subtle",
+                    "path": "turbopack/crates/turbo-tasks-macros/src/function_macro.rs",
+                    "diff_hunk": "@@ -55,11 +55,10 @@ pub fn function(args: TokenStream, input: TokenStream) -> TokenStream {\n     let inline_function_ident = turbo_fn.inline_ident();\n     let (inline_signature, inline_block) = turbo_fn.inline_signature_and_block(&block);\n     let inline_attrs = filter_inline_attributes(&attrs[..]);\n-    let function_path_string = ident.to_string();\n \n     let native_fn = NativeFn {\n-        funct",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "lukesandberg",
+                    "body": "#89964 will do this, much simpler",
+                    "path": "turbopack/crates/turbo-tasks-macros/src/value_impl_macro.rs",
+                    "diff_hunk": "@@ -307,9 +303,11 @@ pub fn value_impl(args: TokenStream, input: TokenStream) -> TokenStream {\n             // 4.VTableRegistries (requires ValueTypeIds)\n             turbo_tasks::macro_helpers::inventory_submit!{\n                 turbo_tasks::macro_helpers::CollectableTraitMethods(\n-                    #value_name,\n-                    || (<::std::boxed::Box<dyn #trait_path> as turbo_tasks::VcVal",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "bgw",
+                    "body": "Unfortunately this is a rustfmt bug, I can't remove this extra whitespace. We've run into this in a few other places in our codebase too.",
+                    "path": "turbopack/crates/turbo-tasks/src/macro_helpers.rs",
+                    "diff_hunk": "@@ -142,32 +143,36 @@ inventory::collect! {CollectableTraitCastFunctions}\n \n #[allow(clippy::type_complexity)]\n pub struct CollectableTraitMethods(\n-    // A value type name\n-    pub &'static str,\n-    pub fn() -> (TraitTypeId, Vec<(&'static str, &'static NativeFunction)>),\n+    pub  fn() -> (",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "bgw",
+                    "body": "Thanks!",
+                    "path": "turbopack/crates/turbo-tasks-macros/src/value_impl_macro.rs",
+                    "diff_hunk": "@@ -307,9 +303,11 @@ pub fn value_impl(args: TokenStream, input: TokenStream) -> TokenStream {\n             // 4.VTableRegistries (requires ValueTypeIds)\n             turbo_tasks::macro_helpers::inventory_submit!{\n                 turbo_tasks::macro_helpers::CollectableTraitMethods(\n-                    #value_name,\n-                    || (<::std::boxed::Box<dyn #trait_path> as turbo_tasks::VcVal",
+                    "has_suggestion_block": false
+                  }
+                ],
+                "total_review_comments": 15,
+                "review_rounds": 13
+              },
+              {
+                "pr_number": 89644,
+                "pr_title": "Turbopack: Add inline loader configuration via import attributes",
+                "author": "sokra",
+                "merged": true,
+                "has_formal_rejection": false,
+                "review_bodies": [],
+                "inline_review_comments": [
+                  {
+                    "author": "vercel[bot]",
+                    "body": "Unit tests `test_parse_turbopack_use_annotation` and `test_parse_turbopack_use_with_options` panic at runtime because they call `parsed.as_array().unwrap()` on a JSON object instead of accessing the `\"loaders\"` key first.\n<!-- VADE-CATEGORY: logic -->\n<!-- VADE-GITHUB-SUGGESTION-ID:2402a09554f50aba10db866aec092d41acae36fd02890e980d6ab0e28bebdb41 -->\n\n<!-- VADE-RECOMMENDATION: FIX -->\n<a href=\"https://vercel.com/vercel/~/agent/tasks/96fbb3ec-8531-4a67-adc9-2278302aea83#suggestion-2402a09554f50aba",
+                    "path": "turbopack/crates/turbopack-ecmascript/src/analyzer/imports.rs",
+                    "diff_hunk": "@@ -861,3 +963,216 @@ fn get_import_symbol_from_export(specifier: &ExportSpecifier) -> ImportedSymbol\n         ExportSpecifier::Namespace(..) => ImportedSymbol::Exports,\n     }\n }\n+\n+#[cfg(test)]\n+mod tests {\n+    use swc_core::{\n+        atoms::Atom,\n+        common::DUMMY_SP,\n+        ecma::ast::*,\n+    };\n+\n+    use super::*;\n+\n+    /// Helper to create a string literal expression\n+    fn str_l",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "sokra",
+                    "body": "Pass the data in a structured way instead of serialized JSON",
+                    "path": "turbopack/crates/turbopack-core/src/reference_type.rs",
+                    "diff_hunk": "@@ -75,6 +75,9 @@ pub enum EcmaScriptModulesReferenceSubType {\n     ImportPart(ModulePart),\n     Import,\n     ImportWithType(RcStr),\n+    /// Import with `turbopackUse` assertion specifying inline loaders.\n+    /// The `RcStr` contains the JSON-serialized loader configuration.\n+    ImportWithTurbopackUse(RcStr),",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "sokra",
+                    "body": "Store that in a structured way",
+                    "path": "turbopack/crates/turbopack-ecmascript/src/analyzer/imports.rs",
+                    "diff_hunk": "@@ -31,6 +32,9 @@ pub struct ImportAnnotations {\n     #[turbo_tasks(trace_ignore)]\n     #[bincode(with_serde)]\n     map: BTreeMap<Wtf8Atom, Wtf8Atom>,\n+    /// JSON-serialized turbopackUse loader configuration from import assertions.\n+    /// e.g. `import \"file\" with { turbopackUse: [{ loader: \"raw-loader\" }] }`\n+    turbopack_use: Option<RcStr>,",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "vercel[bot]",
+                    "body": "The new commits significantly refactored the code, removing the JSON serialization approach entirely. The test functions `test_parse_turbopack_use_annotation` and `test_parse_turbopack_use_with_options` no longer exist in the file (the `mod tests` block was removed), so the bug is no longer applicable.",
+                    "path": "turbopack/crates/turbopack-ecmascript/src/analyzer/imports.rs",
+                    "diff_hunk": "@@ -861,3 +963,216 @@ fn get_import_symbol_from_export(specifier: &ExportSpecifier) -> ImportedSymbol\n         ExportSpecifier::Namespace(..) => ImportedSymbol::Exports,\n     }\n }\n+\n+#[cfg(test)]\n+mod tests {\n+    use swc_core::{\n+        atoms::Atom,\n+        common::DUMMY_SP,\n+        ecma::ast::*,\n+    };\n+\n+    use super::*;\n+\n+    /// Helper to create a string literal expression\n+    fn str_l",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "mischnic",
+                    "body": "Sounds like that type should have `is_internal() == true`?",
+                    "path": "turbopack/crates/turbopack-core/src/reference_type.rs",
+                    "diff_hunk": "@@ -332,6 +342,7 @@ impl Display for ReferenceType {\n             ReferenceType::Entry(_) => \"entry\",\n             ReferenceType::Runtime => \"runtime\",\n             ReferenceType::Internal(_) => \"internal\",\n+            ReferenceType::Loader => \"loader\",",
+                    "has_suggestion_block": false
+                  }
+                ],
+                "total_review_comments": 5,
+                "review_rounds": 6
+              }
+            ]
+          },
+          "facebook/react": {
+            "patterns_found": 4,
+            "valid_patterns": 4,
+            "sample": [
+              {
+                "pr_number": 35720,
+                "pr_title": "[eslint-plugin-react-hooks] Add ESLint v10 support",
+                "author": "azat-io",
+                "merged": true,
+                "has_formal_rejection": true,
+                "review_bodies": [
+                  {
+                    "author": "josephsavona",
+                    "state": "APPROVED",
+                    "body": "Awesome, thanks!"
+                  },
+                  {
+                    "author": "josephsavona",
+                    "state": "CHANGES_REQUESTED",
+                    "body": "You'll also need to update https://github.com/facebook/react/blob/main/.github/workflows/runtime_eslint_plugin_e2e.yml#L27-L31 to make sure the new fixture runs in CI"
+                  }
+                ],
+                "inline_review_comments": [],
+                "total_review_comments": 0,
+                "review_rounds": 2
+              },
+              {
+                "pr_number": 30522,
+                "pr_title": "[Fiber] Make DevTools Config use Static Injection",
+                "author": "sebmarkbage",
+                "merged": true,
+                "has_formal_rejection": false,
+                "review_bodies": [],
+                "inline_review_comments": [
+                  {
+                    "author": "hoxyq",
+                    "body": "This will require some changes on React Native side before the sync",
+                    "path": "packages/react-native-renderer/src/ReactFiberConfigFabric.js",
+                    "diff_hunk": "@@ -48,11 +48,27 @@ const {\n   unstable_getCurrentEventPriority: fabricGetCurrentEventPriority,\n } = nativeFabricUIManager;\n \n+import {getClosestInstanceFromNode} from './ReactFabricComponentTree';\n+\n+import {\n+  getInspectorDataForViewTag,\n+  getInspectorDataForViewAtPoint,\n+  getInspectorDataForInstance,\n+} from './ReactNativeFiberInspector';\n+\n import {\n   enableFabricCompleteRootInCommitPhase,",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "sebmarkbage",
+                    "body": "Why is that? I tried to keep it the same as far as what React Native observes.",
+                    "path": "packages/react-native-renderer/src/ReactFiberConfigFabric.js",
+                    "diff_hunk": "@@ -48,11 +48,27 @@ const {\n   unstable_getCurrentEventPriority: fabricGetCurrentEventPriority,\n } = nativeFabricUIManager;\n \n+import {getClosestInstanceFromNode} from './ReactFabricComponentTree';\n+\n+import {\n+  getInspectorDataForViewTag,\n+  getInspectorDataForViewAtPoint,\n+  getInspectorDataForInstance,\n+} from './ReactNativeFiberInspector';\n+\n import {\n   enableFabricCompleteRootInCommitPhase,",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "hoxyq",
+                    "body": "You are right, I thought we are calling `<renderer>.rendererConfig.getInspectorDataForViewAtPoint` on RN side, but we [actually use it from RDT global hook](https://github.com/facebook/react-native/blob/main/packages/react-native/Libraries/Inspector/getInspectorDataForViewAtPoint.js#L70), so should be perfectly fine",
+                    "path": "packages/react-native-renderer/src/ReactFiberConfigFabric.js",
+                    "diff_hunk": "@@ -48,11 +48,27 @@ const {\n   unstable_getCurrentEventPriority: fabricGetCurrentEventPriority,\n } = nativeFabricUIManager;\n \n+import {getClosestInstanceFromNode} from './ReactFabricComponentTree';\n+\n+import {\n+  getInspectorDataForViewTag,\n+  getInspectorDataForViewAtPoint,\n+  getInspectorDataForInstance,\n+} from './ReactNativeFiberInspector';\n+\n import {\n   enableFabricCompleteRootInCommitPhase,",
+                    "has_suggestion_block": false
+                  }
+                ],
+                "total_review_comments": 3,
+                "review_rounds": 3
+              }
+            ]
+          },
+          "anthropics/claude-code": {
+            "patterns_found": 0,
+            "valid_patterns": 0,
+            "sample": []
+          },
+          "openclaw/openclaw": {
+            "patterns_found": 6,
+            "valid_patterns": 6,
+            "sample": [
+              {
+                "pr_number": 12846,
+                "pr_title": "fix(gateway): normalize session key casing to prevent ghost sessions",
+                "author": "mcaxtr",
+                "merged": true,
+                "has_formal_rejection": false,
+                "review_bodies": [
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>2 files reviewed, 2 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>2 files reviewed, 2 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>2 files reviewed, 2 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>2 files reviewed, 2 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>2 files reviewed, 2 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>1 file reviewed, 1 comment</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  }
+                ],
+                "inline_review_comments": [
+                  {
+                    "author": "greptile-apps[bot]",
+                    "body": "**Legacy key not fully migrated**\n\nWhen `hasKey` resolves via a legacy mixed-case entry, this only migrates/deletes a single `legacyKey` (the first match). If multiple case-variant duplicates exist in the store (the ghost-session scenario), `target.storeKeys` can contain several legacy keys and this code will leave the others behind, so `sessions.resolve` won\u2019t fully clean up duplicates. Consider migrating/deleting *all* matching legacy keys (except `target.canonicalKey`) within the same `update",
+                    "path": "src/gateway/sessions-resolve.ts",
+                    "diff_hunk": "@@ -46,13 +46,22 @@ export function resolveSessionKeyFromResolveParams(params: {\n   if (hasKey) {\n     const target = resolveGatewaySessionStoreTarget({ cfg, key });\n     const store = loadSessionStore(target.storePath);\n-    const existingKey = target.storeKeys.find((candidate) => store[candidate]);\n-    if (!existingKey) {\n+    if (store[target.canonicalKey]) {\n+      return { ok: true, key: tar",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "body": "**Lowercasing breaks session keys**\n\n`spawnedByValue` is forced to lowercase here (`spawnedByValue = spawnedByValue.toLowerCase()`), but session keys may be case-sensitive for the non-`agent:` portion (and other codepaths canonicalize via `resolveSessionStoreKey` / `canonicalizeSpawnedByForAgent`, not plain lowercasing). This can break linking to an existing parent session when the original key had mixed casing, and it bypasses the alias logic for `main`. Prefer canonicalizing `spawnedByValue` w",
+                    "path": "src/gateway/server-methods/agent.ts",
+                    "diff_hunk": "@@ -210,14 +210,19 @@ export const agentHandlers: GatewayRequestHandlers = {\n     let sessionEntry: SessionEntry | undefined;\n     let bestEffortDeliver = false;\n     let cfgForAgent: ReturnType<typeof loadConfig> | undefined;\n+    let resolvedSessionKey = requestedSessionKey;\n \n     if (requestedSessionKey) {\n-      const { cfg, storePath, entry, canonicalKey } = loadSessionEntry(requestedSession",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "body": "**spawnedBy lowercased too early**\n\nHere `spawnedByValue` is lowercased before `loadSessionEntry(spawnedByValue)` is used to inherit group metadata. If the store contains multiple case-variant duplicates, lowercasing can pick the \u201cwrong\u201d duplicate entry (or one with different metadata) because `loadSessionEntry()` will now do a case-insensitive scan and return the first match. Canonicalize `spawnedByValue` using the same session-key canonicalization rules (and/or prefer the canonical key entry w",
+                    "path": "src/gateway/server-methods/agent.ts",
+                    "diff_hunk": "@@ -210,14 +210,19 @@ export const agentHandlers: GatewayRequestHandlers = {\n     let sessionEntry: SessionEntry | undefined;\n     let bestEffortDeliver = false;\n     let cfgForAgent: ReturnType<typeof loadConfig> | undefined;\n+    let resolvedSessionKey = requestedSessionKey;\n \n     if (requestedSessionKey) {\n-      const { cfg, storePath, entry, canonicalKey } = loadSessionEntry(requestedSession",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "body": "**Preview misses legacy keys**\n\n`sessions.preview` calls `resolveGatewaySessionStoreTarget({ ..., scanLegacyKeys: false })`, and then only checks `store[target.canonicalKey]` or `target.storeKeys` (which, with scanning disabled, won\u2019t include on-disk mixed-case variants). If the UI passes canonical lowercased keys from `sessions.list` while the store still contains only a legacy mixed-case key (the exact ghost-session scenario), preview will incorrectly report `missing`. Consider either enabling",
+                    "path": "src/gateway/server-methods/sessions.ts",
+                    "diff_hunk": "@@ -104,12 +104,12 @@ export const sessionsHandlers: GatewayRequestHandlers = {\n \n     for (const key of keys) {\n       try {\n-        const target = resolveGatewaySessionStoreTarget({ cfg, key });\n+        const target = resolveGatewaySessionStoreTarget({ cfg, key, scanLegacyKeys: false });\n         const store = storeCache.get(target.storePath) ?? loadSessionStore(target.storePath);\n         sto",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "mcaxtr",
+                    "body": "Fixed in 2e68d2e54. The migration now deletes ALL legacy case-variant keys in the store (not just the first match), ensuring full cleanup of ghost duplicates when `sessions.resolve` encounters multiple case variants.",
+                    "path": "src/gateway/sessions-resolve.ts",
+                    "diff_hunk": "@@ -46,13 +46,22 @@ export function resolveSessionKeyFromResolveParams(params: {\n   if (hasKey) {\n     const target = resolveGatewaySessionStoreTarget({ cfg, key });\n     const store = loadSessionStore(target.storePath);\n-    const existingKey = target.storeKeys.find((candidate) => store[candidate]);\n-    if (!existingKey) {\n+    if (store[target.canonicalKey]) {\n+      return { ok: true, key: tar",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "mcaxtr",
+                    "body": "Fixed in 2e68d2e54. Replaced raw `.toLowerCase()` with `canonicalizeSpawnedByForAgent()` which properly handles sentinels (`global`/`unknown`), the `agent:` prefix, bare names, and the `main` alias \u2014 consistent with how all other codepaths canonicalize session keys.",
+                    "path": "src/gateway/server-methods/agent.ts",
+                    "diff_hunk": "@@ -210,14 +210,19 @@ export const agentHandlers: GatewayRequestHandlers = {\n     let sessionEntry: SessionEntry | undefined;\n     let bestEffortDeliver = false;\n     let cfgForAgent: ReturnType<typeof loadConfig> | undefined;\n+    let resolvedSessionKey = requestedSessionKey;\n \n     if (requestedSessionKey) {\n-      const { cfg, storePath, entry, canonicalKey } = loadSessionEntry(requestedSession",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "mcaxtr",
+                    "body": "Fixed in 2e68d2e54. `spawnedByValue` is now canonicalized via `canonicalizeSpawnedByForAgent()` before being passed to `loadSessionEntry()`, ensuring it uses the canonical form for store lookup rather than a raw lowercased string.",
+                    "path": "src/gateway/server-methods/agent.ts",
+                    "diff_hunk": "@@ -210,14 +210,19 @@ export const agentHandlers: GatewayRequestHandlers = {\n     let sessionEntry: SessionEntry | undefined;\n     let bestEffortDeliver = false;\n     let cfgForAgent: ReturnType<typeof loadConfig> | undefined;\n+    let resolvedSessionKey = requestedSessionKey;\n \n     if (requestedSessionKey) {\n-      const { cfg, storePath, entry, canonicalKey } = loadSessionEntry(requestedSession",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "mcaxtr",
+                    "body": "Fixed in 2e68d2e54. Added a case-insensitive fallback in the preview handler: after checking `store[target.canonicalKey]` and the computed `storeKeys`, it now scans the already-loaded store for a key matching case-insensitively. This catches legacy mixed-case entries without an extra disk read (the store is already cached in `storeCache`).",
+                    "path": "src/gateway/server-methods/sessions.ts",
+                    "diff_hunk": "@@ -104,12 +104,12 @@ export const sessionsHandlers: GatewayRequestHandlers = {\n \n     for (const key of keys) {\n       try {\n-        const target = resolveGatewaySessionStoreTarget({ cfg, key });\n+        const target = resolveGatewaySessionStoreTarget({ cfg, key, scanLegacyKeys: false });\n         const store = storeCache.get(target.storePath) ?? loadSessionStore(target.storePath);\n         sto",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "body": "**Main alias not canonicalized**\n\n`canonicalizeSpawnedByForAgent()` lowercases and normalizes prefixes, but it doesn\u2019t apply the main-alias mapping (e.g. `main`/`agent:{id}:main` \u2192 configured `mainKey`). This means a `spawnedBy` of `main` or `agent:ops:main` will remain `agent:ops:main` even when the agent\u2019s configured main session is `agent:ops:work`, so parent linking and `sessions.list`/filters can diverge from the canonical store key.\n\nThis helper should reuse the same alias/canonicalization",
+                    "path": "src/gateway/session-utils.ts",
+                    "diff_hunk": "@@ -396,21 +441,29 @@ function resolveSessionStoreAgentId(cfg: OpenClawConfig, canonicalKey: string):\n   return resolveDefaultStoreAgentId(cfg);\n }\n \n-function canonicalizeSpawnedByForAgent(agentId: string, spawnedBy?: string): string | undefined {\n+export function canonicalizeSpawnedByForAgent(\n+  agentId: string,\n+  spawnedBy?: string,\n+): string | undefined {\n   const raw = spawnedBy?.trim();\n ",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "mcaxtr",
+                    "body": "Fixed in 5f1272ff6. `canonicalizeSpawnedByForAgent()` now accepts a `cfg` parameter and applies `canonicalizeMainSessionAlias()` after lowercasing. This resolves main-alias references (e.g. `agent:ops:main` \u2192 `agent:ops:work` when mainKey is configured) so that `spawnedBy` links use the same canonical key as the store.",
+                    "path": "src/gateway/session-utils.ts",
+                    "diff_hunk": "@@ -396,21 +441,29 @@ function resolveSessionStoreAgentId(cfg: OpenClawConfig, canonicalKey: string):\n   return resolveDefaultStoreAgentId(cfg);\n }\n \n-function canonicalizeSpawnedByForAgent(agentId: string, spawnedBy?: string): string | undefined {\n+export function canonicalizeSpawnedByForAgent(\n+  agentId: string,\n+  spawnedBy?: string,\n+): string | undefined {\n   const raw = spawnedBy?.trim();\n ",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "body": "**Leaves duplicate legacy keys**\n\n`loadSessionEntry()` now returns only a single `legacyKey` (first match), and this write path deletes just that one (`delete store[legacyKey]`). If the store already contains multiple case-variant duplicates for the same session key (the ghost-session scenario), the other legacy keys remain and the store won\u2019t converge on a single canonical key unless another endpoint (e.g. `sessions.resolve`) happens to clean them up. Consider deleting *all* case-insensitive ma",
+                    "path": "src/gateway/server-methods/agent.ts",
+                    "diff_hunk": "@@ -279,21 +286,25 @@ export const agentHandlers: GatewayRequestHandlers = {\n       }\n       resolvedSessionId = sessionId;\n       const canonicalSessionKey = canonicalKey;\n+      resolvedSessionKey = canonicalSessionKey;\n       const agentId = resolveAgentIdFromSessionKey(canonicalSessionKey);\n       const mainSessionKey = resolveAgentMainSessionKey({ cfg, agentId });\n       if (storePath) {\n    ",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "body": "**Legacy variants not fully cleaned**\n\nBoth `voice.transcript` and `agent.request` update paths only delete a single `legacyKey` when persisting (`delete store[legacyKey]`). If the session store contains multiple mixed-case duplicates for the same canonical key, the remaining variants are left behind, so ghost sessions can persist even as new events keep updating the canonical key. Cleaning up all case-insensitive matches for `canonicalKey` here would make node-driven writes converge too.\n\n<deta",
+                    "path": "src/gateway/server-node-events.ts",
+                    "diff_hunk": "@@ -36,11 +36,14 @@ export const handleNodeEvent = async (ctx: NodeEventContext, nodeId: string, evt\n       const cfg = loadConfig();\n       const rawMainKey = normalizeMainKey(cfg.session?.mainKey);\n       const sessionKey = sessionKeyRaw.length > 0 ? sessionKeyRaw : rawMainKey;\n-      const { storePath, entry, canonicalKey } = loadSessionEntry(sessionKey);\n+      const { storePath, entry, canoni",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "mcaxtr",
+                    "body": "Fixed in aaf147d5d. All write paths (agent, node-events, and sessions handlers) now use `findStoreKeysIgnoreCase()` to delete ALL case-variant legacy keys in a single pass, ensuring ghost duplicates are fully cleaned up on every store write \u2014 not just the first match.",
+                    "path": "src/gateway/server-methods/agent.ts",
+                    "diff_hunk": "@@ -279,21 +286,25 @@ export const agentHandlers: GatewayRequestHandlers = {\n       }\n       resolvedSessionId = sessionId;\n       const canonicalSessionKey = canonicalKey;\n+      resolvedSessionKey = canonicalSessionKey;\n       const agentId = resolveAgentIdFromSessionKey(canonicalSessionKey);\n       const mainSessionKey = resolveAgentMainSessionKey({ cfg, agentId });\n       if (storePath) {\n    ",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "mcaxtr",
+                    "body": "Fixed in aaf147d5d. Both `voice.transcript` and `agent.request` write paths now use `findStoreKeysIgnoreCase()` to delete all case-insensitive matches (excluding the canonical key) in the same `updateSessionStore` transaction. This ensures node-driven writes converge the store to a single canonical key.",
+                    "path": "src/gateway/server-node-events.ts",
+                    "diff_hunk": "@@ -36,11 +36,14 @@ export const handleNodeEvent = async (ctx: NodeEventContext, nodeId: string, evt\n       const cfg = loadConfig();\n       const rawMainKey = normalizeMainKey(cfg.session?.mainKey);\n       const sessionKey = sessionKeyRaw.length > 0 ? sessionKeyRaw : rawMainKey;\n-      const { storePath, entry, canonicalKey } = loadSessionEntry(sessionKey);\n+      const { storePath, entry, canoni",
+                    "has_suggestion_block": false
+                  }
+                ],
+                "total_review_comments": 14,
+                "review_rounds": 20
+              },
+              {
+                "pr_number": 15715,
+                "pr_title": "WIP: local changes before upstream sync",
+                "author": "sid1943",
+                "merged": false,
+                "has_formal_rejection": false,
+                "review_bodies": [
+                  {
+                    "author": "greptile-apps[bot]",
+                    "state": "COMMENTED",
+                    "body": "<sub>58 files reviewed, 2 comments</sub>\n\n<sub>[Edit Code Review Agent Settings](https://app.greptile.com/review/github) | [Greptile](https://greptile.com?utm_source=greptile_expert&utm_medium=github&utm_campaign=code_reviews)</sub>"
+                  },
+                  {
+                    "author": "chatgpt-codex-connector[bot]",
+                    "state": "COMMENTED",
+                    "body": "### \ud83d\udca1 Codex Review\n\nHere are some automated review suggestions for this pull request.\n\n**Reviewed commit:** `a51fc9158b`\n    \n\n<details> <summary>\u2139\ufe0f About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](http://chatgpt.com/codex/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\".\n\nIf Codex has suggestions, it will comment; otherwise it will react with \ud83d\udc4d.\n\n\n\n\nCodex c"
+                  }
+                ],
+                "inline_review_comments": [
+                  {
+                    "author": "greptile-apps[bot]",
+                    "body": "**Committed local config + token**\n\nThis file appears to be a developer-local config snapshot (absolute path under `/Users/...`) and it includes a live `gateway.auth.token`. Committing this leaks a reusable secret and also bakes in machine-specific paths; these `.tmp/**/openclaw.json*` files should be removed from the PR (and the leaked token should be rotated).\n\n<details><summary>Prompt To Fix With AI</summary>\n\n`````markdown\nThis is a comment left during a code review.\nPath: .tmp/dev/openclaw.",
+                    "path": ".tmp/dev/openclaw.json",
+                    "diff_hunk": "@@ -0,0 +1,48 @@\n+{\n+  \"agents\": {\n+    \"defaults\": {",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "greptile-apps[bot]",
+                    "body": "**Unexpected npm lockfile**\n\nThis PR adds a new root `package-lock.json` (~14k lines). The repo uses `pnpm` (and typically relies on `pnpm-lock.yaml`), so committing an npm lockfile will create conflicting dependency sources and CI drift unless the project explicitly switched package managers. If this is accidental, drop `package-lock.json` from the PR; if intentional, the repo needs an explicit migration and updates to tooling/docs/CI in the same PR.\n\n<details><summary>Prompt To Fix With AI</su",
+                    "path": "package-lock.json",
+                    "diff_hunk": "@@ -0,0 +1,13998 @@\n+{\n+  \"name\": \"openclaw\",\n+  \"version\": \"2026.2.12\",",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "chatgpt-codex-connector[bot]",
+                    "body": "**<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat)</sub></sub>  Pass overridden port to gateway readiness checks**\n\nThe new `start` command accepts `--port` and uses it for daemon install, but readiness probing calls `callGateway` without any URL/port override, so it always checks the port from config. If a user runs `openclaw start --port <non-default>`, the gateway can be healthy while this check still times out because it probes the wrong socket.\n\nUseful? React with \ud83d\udc4d\u00a0",
+                    "path": "src/cli/start-cli.ts",
+                    "diff_hunk": "@@ -0,0 +1,148 @@\n+import type { Command } from \"commander\";\n+import { channelsStatusCommand } from \"../commands/channels.js\";\n+import {\n+  detectLegacyStateMigrations,\n+  runLegacyStateMigrations,\n+} from \"../commands/doctor-state-migrations.js\";\n+import { loadConfig, resolveGatewayPort } from \"../config/config.js\";\n+import { callGateway } from \"../gateway/call.js\";\n+import { defaultRuntime } fro",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "chatgpt-codex-connector[bot]",
+                    "body": "**<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat)</sub></sub>  Remove committed gateway auth token from temp config**\n\nThis commit adds a tracked temp config containing a concrete `gateway.auth.token`, which leaks authentication material into repository history. Even if it was generated locally, committed secrets are broadly accessible to anyone with repo access and can be reused accidentally; these files should not contain real tokens.\n\nUseful? React with \ud83d\udc4d\u00a0/ \ud83d\udc4e.",
+                    "path": ".tmp/dev/openclaw.json",
+                    "diff_hunk": "@@ -0,0 +1,48 @@\n+{\n+  \"agents\": {\n+    \"defaults\": {\n+      \"workspace\": \"/Users/jarvis/.openclaw/workspace-dev\",\n+      \"skipBootstrap\": true,\n+      \"maxConcurrent\": 4,\n+      \"subagents\": {\n+        \"maxConcurrent\": 8\n+      },\n+      \"contextPruning\": {\n+        \"mode\": \"cache-ttl\",\n+        \"ttl\": \"1h\"\n+      },\n+      \"heartbeat\": {\n+        \"every\": \"30m\"\n+      },\n+      \"compaction\": {\n+",
+                    "has_suggestion_block": false
+                  },
+                  {
+                    "author": "chatgpt-codex-connector[bot]",
+                    "body": "**<sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub>  Point network test config at the existing chutes OAuth test**\n\nThe network test include list references `src/commands/chutes-oauth.test.ts`, but the actual test file in this repo is `src/commands/chutes-oauth.e2e.test.ts`. This typo causes `test:integration:network` to skip that suite, and the matching typo in unit excludes means test partitioning is inconsistent.\n\nUseful? React with \ud83d\udc4d\u00a0/ \ud83d\udc4e.",
+                    "path": "vitest.network.config.ts",
+                    "diff_hunk": "@@ -0,0 +1,21 @@\n+import { defineConfig } from \"vitest/config\";\n+import baseConfig from \"./vitest.config.ts\";\n+\n+const baseTest = (baseConfig as { test?: { exclude?: string[] } }).test ?? {};\n+const exclude = baseTest.exclude ?? [];\n+\n+export default defineConfig({\n+  ...baseConfig,\n+  test: {\n+    ...baseTest,\n+    include: [\n+      \"src/browser/cdp.test.ts\",\n+      \"src/canvas-host/server.test.t",
+                    "has_suggestion_block": false
+                  }
+                ],
+                "total_review_comments": 5,
+                "review_rounds": 2
+              }
+            ]
+          }
+        }
+      },
+      "error": null,
+      "duration_seconds": 261.04
+    },
+    {
+      "name": "Provenance Coverage",
+      "score": 0.4004,
+      "details": {
+        "total_rules": 753,
+        "rules_with_provenance_url": 258,
+        "rules_with_provenance_summary": 345,
+        "valid_github_urls": 258,
+        "url_coverage_pct": 34.3,
+        "summary_coverage_pct": 45.8
+      },
+      "error": null,
+      "duration_seconds": 0.05
+    },
+    {
+      "name": "Path Scoping Coverage",
+      "score": 0.2683,
+      "details": {
+        "total_rules": 753,
+        "rules_with_paths": 202,
+        "rules_with_valid_globs": 201,
+        "path_coverage_pct": 26.8
+      },
+      "error": null,
+      "duration_seconds": 0.04
+    },
+    {
+      "name": "Modular Rules Generation",
+      "score": 1.0,
+      "details": {
+        "total_files_generated": 128,
+        "valid_files": 128,
+        "repos_with_donot": 7,
+        "file_validity_pct": 100.0,
+        "donot_coverage_pct": 100.0,
+        "per_repo": {
+          "langchain-ai/langchain": {
+            "total_files": 14,
+            "valid_files": 14,
+            "has_donot": true,
+            "file_paths": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/do-not.md",
+              ".claude/rules/code-style.md",
+              ".claude/rules/testing.md",
+              ".claude/rules/workflow.md",
+              ".claude/rules/architecture.md",
+              ".claude/rules/domain.md",
+              ".claude/rules/libs/formatting.md",
+              ".claude/rules/libs/core.md",
+              ".claude/rules/libs/langchain-legacy.md"
+            ]
+          },
+          "denoland/deno": {
+            "total_files": 15,
+            "valid_files": 15,
+            "has_donot": true,
+            "file_paths": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/do-not.md",
+              ".claude/rules/**/architecture.md",
+              ".claude/rules/**/style.md",
+              ".claude/rules/architecture.md",
+              ".claude/rules/cli/style.md",
+              ".claude/rules/design.md",
+              ".claude/rules/domain.md",
+              ".claude/rules/ext/architecture.md",
+              ".claude/rules/general.md"
+            ]
+          },
+          "prisma/prisma": {
+            "total_files": 16,
+            "valid_files": 16,
+            "has_donot": true,
+            "file_paths": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/do-not.md",
+              ".claude/rules/code-style.md",
+              ".claude/rules/testing.md",
+              ".claude/rules/workflow.md",
+              ".claude/rules/architecture.md",
+              ".claude/rules/ci.md",
+              ".claude/rules/security.md",
+              ".claude/rules/domain.md",
+              ".claude/rules/product.md"
+            ]
+          },
+          "vercel/next.js": {
+            "total_files": 18,
+            "valid_files": 18,
+            "has_donot": true,
+            "file_paths": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/do-not.md",
+              ".claude/rules/apps/workflow.md",
+              ".claude/rules/architecture.md",
+              ".claude/rules/code-style.md",
+              ".claude/rules/crates/architecture.md",
+              ".claude/rules/crates/performance.md",
+              ".claude/rules/crates/style.md",
+              ".claude/rules/crates/testing.md",
+              ".claude/rules/design.md"
+            ]
+          },
+          "facebook/react": {
+            "total_files": 14,
+            "valid_files": 14,
+            "has_donot": true,
+            "file_paths": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/code-style.md",
+              ".claude/rules/testing.md",
+              ".claude/rules/do-not.md",
+              ".claude/rules/workflow.md",
+              ".claude/rules/architecture.md",
+              ".claude/rules/product.md",
+              ".claude/rules/domain.md",
+              ".claude/rules/compiler/workflow.md",
+              ".claude/rules/compiler/anti-patterns.md"
+            ]
+          },
+          "anthropics/claude-code": {
+            "total_files": 16,
+            "valid_files": 16,
+            "has_donot": true,
+            "file_paths": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/code-style.md",
+              ".claude/rules/testing.md",
+              ".claude/rules/do-not.md",
+              ".claude/rules/workflow.md",
+              ".claude/rules/architecture.md",
+              ".claude/rules/security.md",
+              ".claude/rules/ci.md",
+              ".claude/rules/domain.md",
+              ".claude/rules/design.md"
+            ]
+          },
+          "openclaw/openclaw": {
+            "total_files": 35,
+            "valid_files": 35,
+            "has_donot": true,
+            "file_paths": [
+              ".claude/CLAUDE.md",
+              ".claude/rules/do-not.md",
+              ".claude/rules/**/style.md",
+              ".claude/rules/**/testing.md",
+              ".claude/rules/agent/domain.md",
+              ".claude/rules/architecture.md",
+              ".claude/rules/canvas-host/domain.md",
+              ".claude/rules/channels/security.md",
+              ".claude/rules/cli/architecture.md",
+              ".claude/rules/cli/style.md"
+            ]
+          }
+        }
+      },
+      "error": null,
+      "duration_seconds": 1242.18
+    },
+    {
+      "name": "Incremental Extraction",
+      "score": 1.0,
+      "details": {
+        "successful_extractions": 7,
+        "total_attempts": 7,
+        "per_repo": {
+          "langchain-ai/langchain": {
+            "pr_number": 35115,
+            "new_rules": 0,
+            "new_proposals": 1,
+            "auto_approved_count": 0,
+            "confidence_check_passed": true
+          },
+          "denoland/deno": {
+            "pr_number": 31993,
+            "new_rules": 0,
+            "new_proposals": 3,
+            "auto_approved_count": 0,
+            "confidence_check_passed": true
+          },
+          "prisma/prisma": {
+            "pr_number": 29038,
+            "new_rules": 0,
+            "new_proposals": 1,
+            "auto_approved_count": 0,
+            "confidence_check_passed": true
+          },
+          "vercel/next.js": {
+            "pr_number": 87938,
+            "new_rules": 0,
+            "new_proposals": 0,
+            "auto_approved_count": 0,
+            "confidence_check_passed": true
+          },
+          "facebook/react": {
+            "pr_number": 35773,
+            "new_rules": 0,
+            "new_proposals": 1,
+            "auto_approved_count": 0,
+            "confidence_check_passed": true
+          },
+          "anthropics/claude-code": {
+            "pr_number": 17238,
+            "new_rules": 0,
+            "new_proposals": 0,
+            "auto_approved_count": 0,
+            "confidence_check_passed": true
+          },
+          "openclaw/openclaw": {
+            "pr_number": 15715,
+            "new_rules": 0,
+            "new_proposals": 4,
+            "auto_approved_count": 0,
+            "confidence_check_passed": true
+          }
+        }
+      },
+      "error": null,
+      "duration_seconds": 539.25
+    },
+    {
+      "name": "Outcome Metrics Collection",
+      "score": 1.0,
+      "details": {
+        "repos_with_valid_metrics": 7,
+        "total_repos": 7,
+        "per_repo": {
+          "langchain-ai/langchain": {
+            "metrics": {
+              "total_prs": 23,
+              "avg_review_rounds": 0.57,
+              "ci_failure_rate": 0.145,
+              "avg_time_to_merge_hours": 25.1
+            },
+            "fields_present": 4,
+            "values_reasonable": true
+          },
+          "denoland/deno": {
+            "metrics": {
+              "total_prs": 43,
+              "avg_review_rounds": 1.83,
+              "ci_failure_rate": 0.0,
+              "avg_time_to_merge_hours": 49.1
+            },
+            "fields_present": 4,
+            "values_reasonable": true
+          },
+          "prisma/prisma": {
+            "metrics": {
+              "total_prs": 23,
+              "avg_review_rounds": 2.17,
+              "ci_failure_rate": 0.032,
+              "avg_time_to_merge_hours": 19.2
+            },
+            "fields_present": 4,
+            "values_reasonable": true
+          },
+          "vercel/next.js": {
+            "metrics": {
+              "total_prs": 17,
+              "avg_review_rounds": 3.12,
+              "ci_failure_rate": 0.067,
+              "avg_time_to_merge_hours": 41.4
+            },
+            "fields_present": 4,
+            "values_reasonable": true
+          },
+          "facebook/react": {
+            "metrics": {
+              "total_prs": 27,
+              "avg_review_rounds": 1.59,
+              "ci_failure_rate": 0.0,
+              "avg_time_to_merge_hours": 13.3
+            },
+            "fields_present": 4,
+            "values_reasonable": true
+          },
+          "anthropics/claude-code": {
+            "metrics": {
+              "total_prs": 4,
+              "avg_review_rounds": 1.5,
+              "ci_failure_rate": 0.0,
+              "avg_time_to_merge_hours": 19.1
+            },
+            "fields_present": 4,
+            "values_reasonable": true
+          },
+          "openclaw/openclaw": {
+            "metrics": {
+              "total_prs": 23,
+              "avg_review_rounds": 2.57,
+              "ci_failure_rate": 0.0,
+              "avg_time_to_merge_hours": 92.2
+            },
+            "fields_present": 4,
+            "values_reasonable": true
+          }
+        }
+      },
+      "error": null,
+      "duration_seconds": 316.65
+    },
+    {
+      "name": "Domain Knowledge Extraction",
+      "score": 0.8105,
+      "details": {
+        "repos_with_domain_rules": 7,
+        "total_domain_rules": 192,
+        "total_repos": 7,
+        "sub_evals": {
+          "7a_content_quality": {
+            "weight": 0.3,
+            "score": 0.8743,
+            "per_repo": {
+              "langchain-ai/langchain": {
+                "rules_sampled": 10,
+                "avg_specificity": 4.6,
+                "avg_actionability": 4.0,
+                "score": 0.86
+              },
+              "denoland/deno": {
+                "rules_sampled": 10,
+                "avg_specificity": 4.4,
+                "avg_actionability": 3.6,
+                "score": 0.8
+              },
+              "prisma/prisma": {
+                "rules_sampled": 5,
+                "avg_specificity": 4.6,
+                "avg_actionability": 4.0,
+                "score": 0.86
+              },
+              "vercel/next.js": {
+                "rules_sampled": 10,
+                "avg_specificity": 5.0,
+                "avg_actionability": 4.6,
+                "score": 0.96
+              },
+              "facebook/react": {
+                "rules_sampled": 10,
+                "avg_specificity": 4.4,
+                "avg_actionability": 3.1,
+                "score": 0.75
+              },
+              "anthropics/claude-code": {
+                "rules_sampled": 10,
+                "avg_specificity": 5.0,
+                "avg_actionability": 4.5,
+                "score": 0.95
+              },
+              "openclaw/openclaw": {
+                "rules_sampled": 10,
+                "avg_specificity": 4.9,
+                "avg_actionability": 4.5,
+                "score": 0.94
+              }
+            }
+          },
+          "7b_domain_coverage": {
+            "weight": 0.25,
+            "score": 0.6071,
+            "per_repo": {
+              "langchain-ai/langchain": {
+                "rules_count": 21,
+                "llm_failed": true,
+                "score": 0.5
+              },
+              "denoland/deno": {
+                "rules_count": 50,
+                "llm_failed": true,
+                "score": 0.5
+              },
+              "prisma/prisma": {
+                "rules_count": 5,
+                "has_readme": true,
+                "completeness": 6,
+                "depth": 7,
+                "score": 0.65
+              },
+              "vercel/next.js": {
+                "rules_count": 15,
+                "has_readme": true,
+                "completeness": 7,
+                "depth": 6,
+                "score": 0.65
+              },
+              "facebook/react": {
+                "rules_count": 40,
+                "has_readme": true,
+                "completeness": 4,
+                "depth": 6,
+                "score": 0.5
+              },
+              "anthropics/claude-code": {
+                "rules_count": 38,
+                "has_readme": true,
+                "completeness": 7,
+                "depth": 8,
+                "score": 0.75
+              },
+              "openclaw/openclaw": {
+                "rules_count": 23,
+                "has_readme": true,
+                "completeness": 6,
+                "depth": 8,
+                "score": 0.7
+              }
+            }
+          },
+          "7c_confidence_calibration": {
+            "weight": 0.15,
+            "score": 0.8286,
+            "per_repo": {
+              "langchain-ai/langchain": {
+                "domain_avg_conf": 0.871,
+                "code_avg_conf": 0.927,
+                "conf_spread": 0.0299,
+                "calibrated": true,
+                "differentiated": false,
+                "no_ceiling": true,
+                "score": 0.7
+              },
+              "denoland/deno": {
+                "domain_avg_conf": 0.869,
+                "code_avg_conf": 0.917,
+                "conf_spread": 0.0265,
+                "calibrated": true,
+                "differentiated": false,
+                "no_ceiling": true,
+                "score": 0.7
+              },
+              "prisma/prisma": {
+                "domain_avg_conf": 0.89,
+                "code_avg_conf": 0.906,
+                "conf_spread": 0.0224,
+                "calibrated": true,
+                "differentiated": false,
+                "no_ceiling": true,
+                "score": 0.7
+              },
+              "vercel/next.js": {
+                "domain_avg_conf": 0.847,
+                "code_avg_conf": 0.885,
+                "conf_spread": 0.0399,
+                "calibrated": true,
+                "differentiated": true,
+                "no_ceiling": true,
+                "score": 1.0
+              },
+              "facebook/react": {
+                "domain_avg_conf": 0.845,
+                "code_avg_conf": 0.873,
+                "conf_spread": 0.0316,
+                "calibrated": true,
+                "differentiated": true,
+                "no_ceiling": true,
+                "score": 1.0
+              },
+              "anthropics/claude-code": {
+                "domain_avg_conf": 0.864,
+                "code_avg_conf": 0.917,
+                "conf_spread": 0.0327,
+                "calibrated": true,
+                "differentiated": true,
+                "no_ceiling": true,
+                "score": 1.0
+              },
+              "openclaw/openclaw": {
+                "domain_avg_conf": 0.852,
+                "code_avg_conf": 0.884,
+                "conf_spread": 0.0281,
+                "calibrated": true,
+                "differentiated": false,
+                "no_ceiling": true,
+                "score": 0.7
+              }
+            }
+          },
+          "7d_category_accuracy": {
+            "weight": 0.15,
+            "score": 0.8143,
+            "per_repo": {
+              "langchain-ai/langchain": {
+                "rules_sampled": 10,
+                "matches": 9,
+                "total_judged": 10,
+                "accuracy": 0.9
+              },
+              "denoland/deno": {
+                "rules_sampled": 10,
+                "matches": 9,
+                "total_judged": 10,
+                "accuracy": 0.9
+              },
+              "prisma/prisma": {
+                "rules_sampled": 5,
+                "matches": 3,
+                "total_judged": 5,
+                "accuracy": 0.6
+              },
+              "vercel/next.js": {
+                "rules_sampled": 10,
+                "matches": 8,
+                "total_judged": 10,
+                "accuracy": 0.8
+              },
+              "facebook/react": {
+                "rules_sampled": 10,
+                "matches": 8,
+                "total_judged": 10,
+                "accuracy": 0.8
+              },
+              "anthropics/claude-code": {
+                "rules_sampled": 10,
+                "matches": 7,
+                "total_judged": 10,
+                "accuracy": 0.7
+              },
+              "openclaw/openclaw": {
+                "rules_sampled": 10,
+                "matches": 10,
+                "total_judged": 10,
+                "accuracy": 1.0
+              }
+            }
+          },
+          "7e_db_schema_selftest": {
+            "weight": 0.15,
+            "score": 1.0,
+            "agent_output_length": 4047,
+            "rules_extracted": 15,
+            "facts_found": 5,
+            "total_expected_facts": 5,
+            "fact_results": [
+              {
+                "table": "knowledge_rules",
+                "concept": "foreign key",
+                "related": "repositories",
+                "found": true
+              },
+              {
+                "table": "outcome_metrics",
+                "concept": "UNIQUE",
+                "related": "repo_id",
+                "found": true
+              },
+              {
+                "table": "mined_sessions",
+                "concept": "UNIQUE",
+                "related": "path",
+                "found": true
+              },
+              {
+                "table": "proposals",
+                "concept": "status",
+                "related": "pending",
+                "found": true
+              },
+              {
+                "table": "created_at",
+                "concept": "timestamp",
+                "related": "datetime",
+                "found": true
+              }
+            ],
+            "temp_repo_id": 11
+          }
+        }
+      },
+      "error": null,
+      "duration_seconds": 505.51
+    },
+    {
+      "name": "Ground Truth Recall",
+      "score": 0.4882,
+      "details": {
+        "repos_with_ground_truth": 6,
+        "total_repos": 7,
+        "avg_recall": 0.4882,
+        "per_repo": {
+          "langchain-ai/langchain": {
+            "total_rules": 64,
+            "contaminated": 40,
+            "independent": 24,
+            "total_guidelines": 21,
+            "matched": 12,
+            "recall": 0.5714
+          },
+          "denoland/deno": {
+            "total_rules": 140,
+            "contaminated": 32,
+            "independent": 108,
+            "total_guidelines": 50,
+            "matched": 12,
+            "recall": 0.24
+          },
+          "prisma/prisma": {
+            "total_rules": 52,
+            "contaminated": 33,
+            "independent": 52,
+            "total_guidelines": 50,
+            "matched": 39,
+            "recall": 0.78
+          },
+          "vercel/next.js": {
+            "total_rules": 64,
+            "contaminated": 38,
+            "independent": 64,
+            "total_guidelines": 50,
+            "matched": 27,
+            "recall": 0.54
+          },
+          "facebook/react": {
+            "total_rules": 73,
+            "contaminated": 14,
+            "independent": 73,
+            "total_guidelines": 3,
+            "matched": 0,
+            "recall": 0.0
+          },
+          "anthropics/claude-code": {
+            "total_rules": 0,
+            "contaminated": 0,
+            "independent": 0,
+            "total_guidelines": 0,
+            "matched": 0,
+            "recall": null
+          },
+          "openclaw/openclaw": {
+            "total_rules": 84,
+            "contaminated": 74,
+            "independent": 84,
+            "total_guidelines": 84,
+            "matched": 67,
+            "recall": 0.80
+          }
+        }
+      },
+      "error": null,
+      "duration_seconds": null
+    }
+  ]
+}

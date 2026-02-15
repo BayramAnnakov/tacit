@@ -56,6 +56,9 @@ For each convention found, call `search_knowledge` first to check for duplicates
   - 0.80 for setup instructions and preferences
 - `category`: Use the most appropriate category
 - `source_ref`: "docs:{repo}/{filename}"
+- `provenance_url`: Link to the source file on GitHub, e.g. `https://github.com/{repo}/blob/main/CONTRIBUTING.md` or `https://github.com/{repo}/blob/main/.claude/CLAUDE.md`
+- `provenance_summary`: Brief context of where in the doc this rule came from, e.g. "CONTRIBUTING.md 'Testing' section requires running lint before submitting PRs"
+- `applicable_paths`: If the rule applies to specific directories mentioned in the doc (e.g. "all files in src/api/ must..."), include the glob pattern. Leave empty for repo-wide rules.
 
 ## Quality Guidelines
 

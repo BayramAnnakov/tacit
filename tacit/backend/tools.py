@@ -9,6 +9,7 @@ import httpx
 
 from claude_agent_sdk import tool, create_sdk_mcp_server
 import database as db
+from db_tools import db_connect, db_inspect_schema, db_sample_data, db_query_readonly
 
 
 def _gh_headers(token: str) -> dict:
@@ -282,12 +283,13 @@ async def github_fetch_repo_structure(args: dict) -> dict:
 
 @tool(
     name="github_fetch_docs",
-    description="Fetch CONTRIBUTING.md, README.md (setup sections only), and any existing CLAUDE.md/AGENTS.md from a repo. Pre-filters README to development-relevant sections.",
+    description="Fetch CONTRIBUTING.md, README.md (setup sections only), and any existing CLAUDE.md/AGENTS.md from a repo. Pre-filters README to development-relevant sections. Set exclude_ground_truth=true to skip CLAUDE.md/AGENTS.md (for eval mode).",
     input_schema={
         "type": "object",
         "properties": {
             "repo": {"type": "string", "description": "Full repo name e.g. 'owner/repo'"},
             "github_token": {"type": "string", "description": "GitHub API token"},
+            "exclude_ground_truth": {"type": "boolean", "description": "If true, skip fetching CLAUDE.md and AGENTS.md files (used for evaluation to avoid circular testing)", "default": False},
         },
         "required": ["repo", "github_token"],
     },
@@ -295,8 +297,12 @@ async def github_fetch_repo_structure(args: dict) -> dict:
 async def github_fetch_docs(args: dict) -> dict:
     repo = args["repo"]
     token = args["github_token"]
+    exclude_gt = args.get("exclude_ground_truth", False)
     headers = _gh_headers(token)
     headers["Accept"] = "application/vnd.github.v3.raw"
+
+    # Ground truth files that should be excluded during eval
+    _GROUND_TRUTH_FILES = {"CLAUDE.md", ".claude/CLAUDE.md", "AGENTS.md"}
 
     doc_files = [
         "CONTRIBUTING.md",
@@ -309,6 +315,9 @@ async def github_fetch_docs(args: dict) -> dict:
         "docs/contributing.md",
         ".github/CONTRIBUTING.md",
     ]
+
+    if exclude_gt:
+        doc_files = [f for f in doc_files if f not in _GROUND_TRUTH_FILES]
 
     result: dict = {}
     setup_keywords = re.compile(
@@ -578,6 +587,90 @@ async def github_fetch_pr_diff(args: dict) -> dict:
             })
 
     return {"content": [{"type": "text", "text": json.dumps(files, indent=2)}]}
+
+
+# --------------- Domain Knowledge Tools ---------------
+
+_BINARY_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".webp", ".bmp",
+    ".zip", ".tar", ".gz", ".bz2", ".7z", ".rar",
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+    ".woff", ".woff2", ".ttf", ".eot", ".otf",
+    ".mp3", ".mp4", ".wav", ".avi", ".mov", ".webm",
+    ".exe", ".dll", ".so", ".dylib", ".bin",
+    ".pyc", ".pyo", ".class", ".o", ".obj",
+    ".lock", ".sum",
+}
+
+
+@tool(
+    name="github_fetch_file_content",
+    description="Fetch a specific file from a GitHub repository by path. Use to read any file identified as containing domain knowledge, architecture docs, design documentation, or OpenAPI specs. Skips binary files.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "repo": {"type": "string", "description": "Full repo name e.g. 'owner/repo'"},
+            "file_path": {"type": "string", "description": "Path to the file in the repo e.g. 'docs/architecture.md'"},
+            "github_token": {"type": "string", "description": "GitHub API token"},
+        },
+        "required": ["repo", "file_path", "github_token"],
+    },
+)
+async def github_fetch_file_content(args: dict) -> dict:
+    repo = args["repo"]
+    file_path = args["file_path"]
+    token = args["github_token"]
+
+    # Skip binary files
+    ext = "." + file_path.rsplit(".", 1)[-1].lower() if "." in file_path else ""
+    if ext in _BINARY_EXTENSIONS:
+        return {"content": [{"type": "text", "text": f"Skipped binary file: {file_path}"}]}
+
+    headers = _gh_headers(token)
+    headers["Accept"] = "application/vnd.github.v3.raw"
+
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        resp = await client.get(
+            f"https://api.github.com/repos/{repo}/contents/{file_path}",
+            headers=headers, timeout=15,
+        )
+        if resp.status_code != 200:
+            return {"content": [{"type": "text", "text": f"File not found: {file_path} (HTTP {resp.status_code})"}]}
+
+        content = resp.text[:20000]  # 20k char cap
+
+    return {"content": [{"type": "text", "text": f"--- {file_path} ---\n{content}"}]}
+
+
+@tool(
+    name="github_fetch_readme_full",
+    description="Fetch the complete README.md from a GitHub repository without section filtering. For domain, product, and design knowledge analysis by the domain-analyzer agent.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "repo": {"type": "string", "description": "Full repo name e.g. 'owner/repo'"},
+            "github_token": {"type": "string", "description": "GitHub API token"},
+        },
+        "required": ["repo", "github_token"],
+    },
+)
+async def github_fetch_readme_full(args: dict) -> dict:
+    repo = args["repo"]
+    token = args["github_token"]
+    headers = _gh_headers(token)
+    headers["Accept"] = "application/vnd.github.v3.raw"
+
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        # Try README.md first, then readme.md
+        for filename in ("README.md", "readme.md", "Readme.md"):
+            resp = await client.get(
+                f"https://api.github.com/repos/{repo}/contents/{filename}",
+                headers=headers, timeout=15,
+            )
+            if resp.status_code == 200:
+                return {"content": [{"type": "text", "text": resp.text[:30000]}]}
+
+    return {"content": [{"type": "text", "text": "No README.md found in this repository."}]}
 
 
 # --------------- Anti-Pattern Mining Tools ---------------
@@ -881,7 +974,7 @@ async def read_claude_logs(args: dict) -> dict:
         "type": "object",
         "properties": {
             "rule_text": {"type": "string", "description": "The knowledge rule text"},
-            "category": {"type": "string", "description": "Category: architecture, testing, style, workflow, security, performance, general"},
+            "category": {"type": "string", "description": "Category: architecture, testing, style, workflow, security, performance, domain, design, product, general"},
             "confidence": {"type": "number", "description": "Confidence score 0.0-1.0"},
             "source_type": {"type": "string", "description": "Source type: 'pr', 'conversation', 'structure', 'docs', 'ci_fix', 'config', 'anti_pattern'"},
             "source_ref": {"type": "string", "description": "Reference to the source (PR URL or log path)"},
@@ -997,6 +1090,8 @@ def create_tacit_tools_server():
             github_fetch_comments,
             github_fetch_repo_structure,
             github_fetch_docs,
+            github_fetch_file_content,
+            github_fetch_readme_full,
             github_fetch_ci_fixes,
             github_fetch_code_samples,
             github_fetch_pr_diff,
@@ -1007,6 +1102,10 @@ def create_tacit_tools_server():
             search_knowledge,
             list_all_knowledge,
             delete_knowledge,
+            db_connect,
+            db_inspect_schema,
+            db_sample_data,
+            db_query_readonly,
         ],
     )
 
@@ -1017,6 +1116,8 @@ _RAW_TOOL_NAMES = [
     "github_fetch_comments",
     "github_fetch_repo_structure",
     "github_fetch_docs",
+    "github_fetch_file_content",
+    "github_fetch_readme_full",
     "github_fetch_ci_fixes",
     "github_fetch_code_samples",
     "github_fetch_pr_diff",
@@ -1027,6 +1128,10 @@ _RAW_TOOL_NAMES = [
     "search_knowledge",
     "list_all_knowledge",
     "delete_knowledge",
+    "db_connect",
+    "db_inspect_schema",
+    "db_sample_data",
+    "db_query_readonly",
 ]
 
 # MCP-prefixed tool names for allowed_tools

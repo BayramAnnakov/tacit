@@ -99,4 +99,16 @@ def get_agent_definitions() -> dict[str, AgentDefinition]:
             model="opus",
             tools=["list_all_knowledge", "search_knowledge"],
         ),
+        "domain-analyzer": AgentDefinition(
+            description="Discovers and extracts domain, product, and design knowledge from README, architecture docs, ADRs, and OpenAPI specs",
+            prompt=_load_prompt("domain_analyzer.md"),
+            model="sonnet",
+            tools=["github_fetch_readme_full", "github_fetch_file_content", "github_fetch_repo_structure", "store_knowledge", "search_knowledge"],
+        ),
+        "db-schema-analyzer": AgentDefinition(
+            description="Extracts domain knowledge from database schemas, constraints, and sample data",
+            prompt=_load_prompt("db_schema_analyzer.md"),
+            model="opus",
+            tools=["db_connect", "db_inspect_schema", "db_sample_data", "db_query_readonly", "store_knowledge", "search_knowledge"],
+        ),
     }

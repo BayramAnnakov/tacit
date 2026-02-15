@@ -66,6 +66,14 @@ struct SidebarView: View {
                 .tag(SidebarItem.claudeMD)
 
                 Label {
+                    Text(".claude/rules/")
+                } icon: {
+                    Image(systemName: "folder.badge.gearshape")
+                        .foregroundStyle(.teal)
+                }
+                .tag(SidebarItem.modularRules)
+
+                Label {
                     Text("Org Patterns")
                 } icon: {
                     Image(systemName: "globe.americas.fill")
@@ -90,6 +98,14 @@ struct SidebarView: View {
                         .foregroundStyle(.cyan)
                 }
                 .tag(SidebarItem.hooks)
+
+                Label {
+                    Text("Onboarding")
+                } icon: {
+                    Image(systemName: "person.badge.plus")
+                        .foregroundStyle(.orange)
+                }
+                .tag(SidebarItem.onboarding)
             }
 
             Section("Insights") {

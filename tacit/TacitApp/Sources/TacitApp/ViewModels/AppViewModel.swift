@@ -6,10 +6,12 @@ enum SidebarItem: Hashable {
     case myDiscoveries
     case proposals
     case claudeMD
+    case modularRules
     case orgPatterns
     case repo(Repository)
     case extraction
     case hooks
+    case onboarding
     case metrics
     case health
 }

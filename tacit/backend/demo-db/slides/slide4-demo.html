@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #0D1117; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+  background-image: url('bg-dark.png');
+  background-size: cover;
+}
+.top-bar { height: 4pt; background: #00D4AA; width: 100%; }
+.content { flex: 1; padding: 28pt 40pt; display: flex; flex-direction: column; }
+h2 { color: #00D4AA; font-size: 26pt; margin: 0 0 4pt 0; }
+.sub { color: #8B949E; font-size: 12pt; margin: 0 0 14pt 0; }
+.terminal {
+  background: #010409;
+  border: 1px solid #30363D;
+  border-radius: 8pt;
+  padding: 14pt 16pt;
+  margin-bottom: 14pt;
+}
+.term-bar { display: flex; gap: 5pt; margin-bottom: 10pt; }
+.dot-r { width: 8pt; height: 8pt; background: #F85149; border-radius: 50%; }
+.dot-y { width: 8pt; height: 8pt; background: #D29922; border-radius: 50%; }
+.dot-g { width: 8pt; height: 8pt; background: #3FB950; border-radius: 50%; }
+.cmd { color: #00D4AA; font-size: 11pt; margin: 0 0 6pt 0; font-family: Courier New, monospace; }
+.output { color: #8B949E; font-size: 10pt; margin: 0 0 3pt 0; font-family: Courier New, monospace; }
+.highlight { color: #C9D1D9; font-size: 10pt; margin: 0 0 3pt 0; font-family: Courier New, monospace; font-weight: bold; }
+.callout-row { display: flex; gap: 12pt; }
+.callout {
+  flex: 1; background: rgba(0, 212, 170, 0.06);
+  border: 1px solid rgba(0, 212, 170, 0.15);
+  border-radius: 8pt; padding: 10pt 12pt;
+}
+.callout-num { color: #00D4AA; font-size: 22pt; font-weight: bold; margin: 0; }
+.callout-label { color: #8B949E; font-size: 10pt; margin: 2pt 0 0 0; }
+</style>
+</head>
+<body>
+<div class="top-bar"></div>
+<div class="content">
+  <h2>Live Demo: OpenClaw</h2>
+  <p class="sub">Real open-source project, 15,000+ PRs, active development</p>
+  <div class="terminal">
+    <div class="term-bar">
+      <div class="dot-r"></div>
+      <div class="dot-y"></div>
+      <div class="dot-g"></div>
+    </div>
+    <p class="cmd">$ python __main__.py openclaw/openclaw --skip-extract</p>
+    <p class="output">  Tacit - Continuous team knowledge extraction</p>
+    <p class="output">  -> Target: openclaw/openclaw</p>
+    <p class="output">  -> Found existing repo (id=10, 158 rules)</p>
+    <p class="output">  -> Generating CLAUDE.md...</p>
+    <p class="highlight">  Generated CLAUDE.md (800 lines)</p>
+    <p class="highlight">  Summary: 158 rules | 47 novel (30%) | 10 anti-patterns | 158 with provenance</p>
+  </div>
+  <div class="callout-row">
+    <div class="callout">
+      <p class="callout-num">158</p>
+      <p class="callout-label">rules extracted</p>
+    </div>
+    <div class="callout">
+      <p class="callout-num">47</p>
+      <p class="callout-label">novel (not in any docs)</p>
+    </div>
+    <div class="callout">
+      <p class="callout-num">10</p>
+      <p class="callout-label">anti-patterns from PR reviews</p>
+    </div>
+    <div class="callout">
+      <p class="callout-num">100%</p>
+      <p class="callout-label">with provenance links</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

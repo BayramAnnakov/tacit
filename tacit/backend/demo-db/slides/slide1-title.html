@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #0D1117; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+  background-image: url('bg-dark.png');
+  background-size: cover;
+}
+.top-bar { height: 4pt; background: #00D4AA; width: 100%; }
+.content {
+  flex: 1; display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  padding: 40pt;
+}
+h1 { color: #00D4AA; font-size: 52pt; margin: 0 0 8pt 0; letter-spacing: 6pt; }
+.subtitle { color: #8B949E; font-size: 18pt; margin: 0 0 30pt 0; }
+.tagline { color: #C9D1D9; font-size: 14pt; margin: 0; }
+.badge {
+  margin-top: 30pt; padding: 8pt 20pt;
+  background: rgba(0, 212, 170, 0.12);
+  border: 1px solid rgba(0, 212, 170, 0.3);
+  border-radius: 20pt;
+}
+.badge-text { color: #00D4AA; font-size: 11pt; margin: 0; }
+</style>
+</head>
+<body>
+<div class="top-bar"></div>
+<div class="content">
+  <h1>TACIT</h1>
+  <p class="subtitle">Continuous Team Knowledge Extraction</p>
+  <p class="tagline">Extract what your team knows but never wrote down</p>
+  <div class="badge">
+    <p class="badge-text">Built with Claude Agent SDK + MCP</p>
+  </div>
+</div>
+</body>
+</html>

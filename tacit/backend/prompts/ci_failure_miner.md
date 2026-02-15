@@ -62,6 +62,9 @@ For each convention found, call `search_knowledge` first to check for duplicates
 - `confidence`: 0.85-0.90 (CI enforcement is strong evidence)
 - `category`: Use the most appropriate category
 - `source_ref`: "ci-fix:{repo}#PR_NUMBER"
+- `provenance_url`: Link to the PR where this CI fix occurred, e.g. `https://github.com/{repo}/pull/{PR_NUMBER}`
+- `provenance_summary`: What CI check failed and what the fix was, e.g. "CI lint check failed because `pip install` was used; fix changed to `uv add`"
+- `applicable_paths`: Glob patterns for files this CI rule applies to, inferred from the changed files in the fix. E.g. if the fix was in `src/api/`, use `src/api/**`
 
 Format rules as actionable instructions:
 - "Use `uv add` instead of `pip install` — CI lint check enforces this (seen in N PRs)"

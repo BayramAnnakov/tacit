@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #0D1117; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+  background-image: url('bg-dark.png');
+  background-size: cover;
+}
+.top-bar { height: 4pt; background: #00D4AA; width: 100%; }
+.content { flex: 1; padding: 30pt 45pt; display: flex; flex-direction: column; }
+h2 { color: #00D4AA; font-size: 28pt; margin: 0 0 6pt 0; }
+.sub { color: #8B949E; font-size: 13pt; margin: 0 0 20pt 0; }
+.pipeline { display: flex; gap: 10pt; margin-bottom: 18pt; }
+.phase {
+  flex: 1; background: rgba(0, 212, 170, 0.06);
+  border: 1px solid rgba(0, 212, 170, 0.15);
+  border-radius: 8pt; padding: 10pt 12pt;
+}
+.phase-num { color: #00D4AA; font-size: 10pt; margin: 0 0 4pt 0; }
+.phase-title { color: #C9D1D9; font-size: 11pt; font-weight: bold; margin: 0 0 4pt 0; }
+.phase-desc { color: #8B949E; font-size: 9pt; margin: 0; }
+.output-row { display: flex; gap: 14pt; }
+.output-box {
+  flex: 1; background: #161B22;
+  border: 1px solid #30363D;
+  border-radius: 8pt; padding: 12pt;
+}
+.output-title { color: #C9D1D9; font-size: 12pt; font-weight: bold; margin: 0 0 6pt 0; }
+.output-desc { color: #8B949E; font-size: 10pt; margin: 0; }
+.arrow { color: #00D4AA; font-size: 10pt; margin: 2pt 0 0 0; }
+</style>
+</head>
+<body>
+<div class="top-bar"></div>
+<div class="content">
+  <h2>How Tacit Works</h2>
+  <p class="sub">16 AI agents mine your repo's history and output native Claude Code format</p>
+  <div class="pipeline">
+    <div class="phase">
+      <p class="phase-num">PHASE 1</p>
+      <p class="phase-title">Parallel Analysis</p>
+      <p class="phase-desc">5 agents scan structure, docs, CI failures, configs, anti-patterns</p>
+    </div>
+    <div class="phase">
+      <p class="phase-num">PHASE 2</p>
+      <p class="phase-title">PR Deep-Dive</p>
+      <p class="phase-desc">Scan CHANGES_REQUESTED reviews, analyze thread discussions</p>
+    </div>
+    <div class="phase">
+      <p class="phase-num">PHASE 3</p>
+      <p class="phase-title">Synthesis</p>
+      <p class="phase-desc">Cross-source dedup, confidence boosting, remove generic rules</p>
+    </div>
+    <div class="phase">
+      <p class="phase-num">PHASE 4</p>
+      <p class="phase-title">Generation</p>
+      <p class="phase-desc">CLAUDE.md + .claude/rules/ with path scoping and provenance</p>
+    </div>
+  </div>
+  <p class="arrow">OUTPUT</p>
+  <div class="output-row">
+    <div class="output-box">
+      <p class="output-title">CLAUDE.md</p>
+      <p class="output-desc">Monolithic file with all conventions organized by section</p>
+    </div>
+    <div class="output-box">
+      <p class="output-title">.claude/rules/</p>
+      <p class="output-desc">35 path-scoped rule files with YAML frontmatter</p>
+    </div>
+    <div class="output-box">
+      <p class="output-title">Provenance Links</p>
+      <p class="output-desc">Every rule traces back to the PR where it was learned</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

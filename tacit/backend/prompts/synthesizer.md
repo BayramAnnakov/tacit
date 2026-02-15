@@ -80,7 +80,15 @@ Ensure each rule is in the best category:
 - `architecture`: module structure, design patterns, dependencies
 - `security`: auth, input validation, secrets management
 - `performance`: optimization requirements, benchmarks
+- `domain`: entity definitions, business rules, domain terminology, data constraints
+- `design`: UI/UX conventions, design tokens, component patterns, accessibility
+- `product`: user personas, product philosophy, feature decisions, "why we built it this way"
 - `general`: anything that doesn't fit above
+
+**Confidence guidance for domain knowledge:**
+- Schema/OpenAPI-derived rules → treat like `config` (high authority)
+- ADR-derived rules → treat like `docs`
+- README product descriptions → confidence cap 0.85
 
 ## Important Rules
 - DO NOT create new rules that weren't derived from existing ones

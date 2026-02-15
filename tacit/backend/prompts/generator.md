@@ -43,6 +43,18 @@ Your job is to generate a well-structured CLAUDE.md file from the knowledge base
 [Key abstractions and their purposes]
 [Dependency management approach]
 
+## Product Context
+[What this product does and who it's for — from domain/product sources]
+[Domain terminology with definitions — key entities, concepts]
+[Business constraints and rules — from schema/ADR/product sources]
+[Skip this section if no domain/product rules exist]
+
+## Design Conventions
+[Design tokens — colors, spacing, typography — from design sources]
+[Component patterns and naming — from design sources]
+[Accessibility requirements]
+[Skip this section if no design rules exist]
+
 ## Workflow
 [PR conventions — title format, description requirements]
 [Commit message format]
@@ -83,3 +95,5 @@ If rules are sparse, prioritize sections in this order:
 5. Workflow (PR/commit conventions)
 6. Testing
 7. Architecture
+8. Product Context (domain knowledge)
+9. Design Conventions

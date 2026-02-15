@@ -1,5 +1,8 @@
 """Extraction pipeline orchestrator using Claude Agent SDK."""
 
+import os
+os.environ.pop("CLAUDECODE", None)  # Allow nested Claude SDK calls from within Claude Code
+
 import asyncio
 import json
 import logging
@@ -60,7 +63,9 @@ async def _run_agent(
     return "\n".join(result_text)
 
 
-async def run_extraction(repo: str, github_token: str) -> AsyncIterator[ExtractionEvent]:
+async def run_extraction(
+    repo: str, github_token: str, run_id: int | None = None, *, exclude_ground_truth: bool = False,
+) -> AsyncIterator[ExtractionEvent]:
     """Orchestrate the multi-source extraction pipeline.
 
     Phase 1: Parallel data gathering (structural, docs, CI fixes)
@@ -84,8 +89,9 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
         repo_record = await db.create_repo(owner, name)
 
     repo_id = repo_record["id"]
-    run = await db.create_extraction_run(repo_id)
-    run_id = run["id"]
+    if run_id is None:
+        run = await db.create_extraction_run(repo_id)
+        run_id = int(run["id"])
 
     try:
         # === Phase 1: Launch parallel analyzers ===
@@ -101,7 +107,7 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
             _run_structural_analysis(repo, github_token, repo_id)
         )
         docs_task = asyncio.create_task(
-            _run_docs_analysis(repo, github_token, repo_id)
+            _run_docs_analysis(repo, github_token, repo_id, exclude_ground_truth=exclude_ground_truth)
         )
         ci_fixes_task = asyncio.create_task(
             _run_ci_failure_mining(repo, github_token, repo_id)
@@ -112,12 +118,15 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
         anti_pattern_task = asyncio.create_task(
             _run_anti_pattern_mining(repo, github_token, repo_id)
         )
+        domain_task = asyncio.create_task(
+            _run_domain_analysis(repo, github_token, repo_id)
+        )
 
         yield ExtractionEvent(
             event_type="progress",
             stage="repo_analysis",
-            message="Launched parallel analysis: repo structure, docs, CI failures, code analysis, anti-patterns",
-            data={"parallel_tasks": ["structural", "docs", "ci_fixes", "code_analysis", "anti_patterns"]},
+            message="Launched parallel analysis: repo structure, docs, CI failures, code analysis, anti-patterns, domain",
+            data={"parallel_tasks": ["structural", "docs", "ci_fixes", "code_analysis", "anti_patterns", "domain"]},
         )
 
         # === Phase 2: PR analysis (sequential, existing flow) ===
@@ -202,12 +211,12 @@ async def run_extraction(repo: str, github_token: str) -> AsyncIterator[Extracti
         )
 
         parallel_results = await asyncio.gather(
-            structural_task, docs_task, ci_fixes_task, code_analysis_task, anti_pattern_task,
+            structural_task, docs_task, ci_fixes_task, code_analysis_task, anti_pattern_task, domain_task,
             return_exceptions=True,
         )
 
         # Report parallel task results
-        task_names = ["Structural analysis", "Docs analysis", "CI failure mining", "Code analysis", "Anti-pattern mining"]
+        task_names = ["Structural analysis", "Docs analysis", "CI failure mining", "Code analysis", "Anti-pattern mining", "Domain analysis"]
         for name, result in zip(task_names, parallel_results):
             if isinstance(result, Exception):
                 logger.warning(f"{name} failed: {result}")
@@ -315,14 +324,24 @@ async def _run_structural_analysis(repo: str, github_token: str, repo_id: int) -
     return await _run_agent("structural-analyzer", prompt, repo_id)
 
 
-async def _run_docs_analysis(repo: str, github_token: str, repo_id: int) -> str:
+async def _run_docs_analysis(
+    repo: str, github_token: str, repo_id: int, *, exclude_ground_truth: bool = False,
+) -> str:
     """Run the docs analyzer agent."""
-    prompt = (
-        f"Analyze the contributing documentation of repository '{repo}'. "
-        f"Use github_fetch_docs with repo='{repo}', github_token='{github_token}'. "
-        f"Extract conventions from CONTRIBUTING.md, README setup sections, and any CLAUDE.md/AGENTS.md. "
-        f"Store each convention using store_knowledge with source_type='docs' and repo_id={repo_id}."
-    )
+    if exclude_ground_truth:
+        prompt = (
+            f"Analyze the contributing documentation of repository '{repo}'. "
+            f"Use github_fetch_docs with repo='{repo}', github_token='{github_token}', exclude_ground_truth=true. "
+            f"IMPORTANT: Do NOT fetch or extract from CLAUDE.md or AGENTS.md files — only use CONTRIBUTING.md, README, and other docs. "
+            f"Store each convention using store_knowledge with source_type='docs' and repo_id={repo_id}."
+        )
+    else:
+        prompt = (
+            f"Analyze the contributing documentation of repository '{repo}'. "
+            f"Use github_fetch_docs with repo='{repo}', github_token='{github_token}'. "
+            f"Extract conventions from CONTRIBUTING.md, README setup sections, and any CLAUDE.md/AGENTS.md. "
+            f"Store each convention using store_knowledge with source_type='docs' and repo_id={repo_id}."
+        )
     return await _run_agent("docs-analyzer", prompt, repo_id)
 
 
@@ -358,6 +377,19 @@ async def _run_anti_pattern_mining(repo: str, github_token: str, repo_id: int) -
         f"Store each rule using store_knowledge with source_type='anti_pattern' and repo_id={repo_id}."
     )
     return await _run_agent("anti-pattern-miner", prompt, repo_id)
+
+
+async def _run_domain_analysis(repo: str, github_token: str, repo_id: int) -> str:
+    """Run the domain analyzer agent to discover domain/product/design knowledge."""
+    prompt = (
+        f"Analyze the domain, product, and design knowledge in repository '{repo}'. "
+        f"Use github_fetch_readme_full with repo='{repo}', github_token='{github_token}' to get the full README. "
+        f"Use github_fetch_repo_structure with repo='{repo}', github_token='{github_token}' to discover the file tree. "
+        f"Identify and read domain-relevant files (ADRs, architecture docs, OpenAPI specs, design docs, glossaries, schema files). "
+        f"Use github_fetch_file_content with repo='{repo}', github_token='{github_token}' to read each identified file. "
+        f"Extract domain, design, and product knowledge rules using store_knowledge with repo_id={repo_id}."
+    )
+    return await _run_agent("domain-analyzer", prompt, repo_id)
 
 
 def _parse_pr_numbers(scanner_result: str) -> list[int]:
@@ -607,8 +639,15 @@ async def mine_all_sessions() -> list[dict]:
     return results
 
 
-async def generate_claude_md(repo_id: int) -> str:
-    """Generate CLAUDE.md content from the knowledge base for a given repo."""
+async def generate_claude_md(repo_id: int, *, fast: bool = False) -> str:
+    """Generate CLAUDE.md content from the knowledge base for a given repo.
+
+    If fast=True, skip the AI agent and build directly from DB rules.
+    """
+    if fast:
+        # Jump straight to the fast fallback path (no LLM call)
+        return await _build_claude_md_from_rules(repo_id)
+
     # First try generating via the AI agent
     try:
         generator_prompt = (
@@ -625,7 +664,12 @@ async def generate_claude_md(repo_id: int) -> str:
     except Exception as e:
         logger.warning(f"Agent-based CLAUDE.md generation failed: {e}")
 
-    # Fallback: build CLAUDE.md directly from rules in the database
+    # Fallback to fast path
+    return await _build_claude_md_from_rules(repo_id)
+
+
+async def _build_claude_md_from_rules(repo_id: int) -> str:
+    """Build CLAUDE.md directly from rules in the database (no LLM call)."""
     rules = await db.list_rules(repo_id=repo_id)
     team_rules = await db.list_rules()
     seen_ids = {r["id"] for r in rules}
@@ -643,6 +687,9 @@ async def generate_claude_md(repo_id: int) -> str:
         "architecture": "Architecture",
         "security": "Security",
         "performance": "Performance",
+        "domain": "Product Context",
+        "design": "Design Conventions",
+        "product": "Product Context",
         "general": "General",
     }
 
@@ -663,7 +710,7 @@ async def generate_claude_md(repo_id: int) -> str:
             regular_rules.setdefault(section, []).append(rule)
 
     # Output regular sections
-    section_order = ["Quick Start", "Development Commands", "Code Style", "Testing", "Architecture", "Workflow", "Security", "Performance", "General"]
+    section_order = ["Quick Start", "Development Commands", "Code Style", "Testing", "Architecture", "Product Context", "Design Conventions", "Workflow", "Security", "Performance", "General"]
     for section in section_order:
         cat_rules = regular_rules.get(section, [])
         if not cat_rules:
@@ -798,11 +845,15 @@ async def collect_outcome_metrics(repo: str, github_token: str, repo_id: int, da
     return {}
 
 
-async def generate_modular_rules(repo_id: int) -> dict:
+async def generate_modular_rules(repo_id: int, *, fast: bool = False) -> dict:
     """Generate a .claude/rules/ directory structure from the knowledge base.
 
     Returns a dict mapping file paths to content strings.
+    If fast=True, skip the AI agent and build directly from DB rules.
     """
+    if fast:
+        return await _build_modular_rules_fallback(repo_id)
+
     # First try via AI agent
     try:
         prompt = (
@@ -842,6 +893,9 @@ async def _build_modular_rules_fallback(repo_id: int) -> dict:
         "architecture": ".claude/rules/architecture.md",
         "security": ".claude/rules/security.md",
         "performance": ".claude/rules/performance.md",
+        "domain": ".claude/rules/domain.md",
+        "design": ".claude/rules/design.md",
+        "product": ".claude/rules/product.md",
         "general": ".claude/rules/general.md",
     }
 

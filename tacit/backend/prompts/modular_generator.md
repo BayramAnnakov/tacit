@@ -46,6 +46,9 @@ Contains ONLY:
 - `architecture.md` — Module structure, design patterns
 - `security.md` — Auth, input validation, secrets
 - `ci.md` — CI/CD conventions
+- `domain.md` — Business rules, domain terminology, entity definitions (no path scope — loaded unconditionally)
+- `design.md` — Design conventions, design tokens, component patterns
+- `product.md` — Product decisions, user personas, philosophy
 
 ### Path-scoped files in subdirectories
 Rules with `applicable_paths` go into scoped files:

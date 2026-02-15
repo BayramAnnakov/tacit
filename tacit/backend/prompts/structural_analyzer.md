@@ -77,6 +77,9 @@ For each convention found, call `search_knowledge` first to check for duplicates
 - `confidence`: 0.90-0.95 (these are observed facts, not opinions)
 - `category`: Use the most appropriate: "workflow" (commit format, merge policy), "style" (naming), "testing" (test organization), "architecture" (module structure)
 - `source_ref`: "repo-structure:{repo}"
+- `provenance_url`: Link to the repo root, e.g. `https://github.com/{repo}`
+- `provenance_summary`: Brief explanation of what structural evidence you observed, e.g. "pnpm-lock.yaml found in repo root, confirming pnpm as package manager"
+- `applicable_paths`: Comma-separated glob patterns for directories/files this rule applies to. E.g. if the convention is about test file naming in `src/`, use `src/**`. If it's repo-wide (like commit format), leave empty.
 
 ## Quality Guidelines
 

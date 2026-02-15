@@ -9,7 +9,7 @@ final class KnowledgeViewModel {
     var selectedCategory = ""
     var isLoading = false
 
-    let categories = ["", "architecture", "style", "testing", "workflow", "performance", "security", "general"]
+    let categories = ["", "architecture", "style", "testing", "workflow", "performance", "security", "domain", "design", "product", "general"]
 
     /// Display name for a category value
     static func displayName(for category: String) -> String {

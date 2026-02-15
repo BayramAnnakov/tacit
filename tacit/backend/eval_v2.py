@@ -1,24 +1,31 @@
 """
 Tacit V2 Comprehensive Eval Suite
 
-Tests 6 new capabilities added in v2:
+Tests 8 capabilities:
 1. Anti-Pattern Mining (CHANGES_REQUESTED patterns from PRs)
 2. Provenance Coverage (source URLs and summaries on rules)
 3. Path Scoping Coverage (applicable_paths with glob patterns)
 4. Modular Rules Generation (.claude/rules/ file structure)
 5. Incremental Extraction Simulation (single-PR extraction)
 6. Outcome Metrics Collection (PR velocity and quality metrics)
+7. Domain Knowledge Extraction (5 sub-evals: content quality, domain coverage,
+   confidence calibration, category accuracy, DB schema self-test)
+8. Ground Truth Recall (for repos with CLAUDE.md/AGENTS.md: what % of
+   documented guidelines can be independently discovered from other sources?)
 
 Usage:
-    python eval_v2.py                  # Full eval (extraction + all 6 evals)
+    python eval_v2.py                  # Full eval (extraction + all 8 evals)
     python eval_v2.py --skip-extraction  # Reuse existing DB, run evals only
 """
+
+import os
+os.environ.pop("CLAUDECODE", None)  # Allow nested Claude SDK calls from within Claude Code
 
 import asyncio
 import argparse
 import json
-import os
 import re
+import statistics
 import sys
 import time
 import traceback
@@ -27,9 +34,18 @@ from datetime import datetime, timezone
 
 import httpx
 
+from claude_agent_sdk import (
+    ClaudeSDKClient,
+    ClaudeAgentOptions,
+    AssistantMessage,
+    ResultMessage,
+    TextBlock,
+)
+
 import database as db
 from pipeline import (
     run_extraction,
+    _run_agent,
     incremental_extract,
     collect_outcome_metrics,
     generate_modular_rules,
@@ -45,6 +61,7 @@ REPOS = [
     ("vercel", "next.js"),
     ("facebook", "react"),
     ("anthropics", "claude-code"),
+    ("openclaw", "openclaw"),
 ]
 
 DB_PATH = Path(__file__).parent / "tacit.db"
@@ -150,6 +167,70 @@ def _gh_headers(token: str) -> dict:
 
 
 _MIN_REVIEW_COMMENTS = 3
+
+
+# ---------------------------------------------------------------------------
+# Helpers: LLM judge + README fetching (for Eval 7 sub-evals)
+# ---------------------------------------------------------------------------
+
+async def _llm_judge(system_prompt: str, user_prompt: str) -> str:
+    """Call Claude Sonnet as LLM judge via Agent SDK. No tools needed."""
+    options = ClaudeAgentOptions(
+        system_prompt=system_prompt,
+        model="sonnet",
+        mcp_servers={},
+        allowed_tools=[],
+        permission_mode="bypassPermissions",
+        max_turns=1,
+    )
+
+    client = ClaudeSDKClient(options=options)
+    await client.connect()
+    try:
+        await client.query(user_prompt)
+        result = []
+        async for message in client.receive_response():
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        result.append(block.text)
+            elif isinstance(message, ResultMessage):
+                if message.is_error:
+                    return ""
+        return "\n".join(result)
+    except Exception:
+        return ""
+    finally:
+        await client.disconnect()
+
+
+def _parse_json_from_llm(raw: str) -> dict | list | None:
+    """Extract JSON from LLM output, handling markdown code blocks."""
+    raw = raw.strip()
+    if "```" in raw:
+        match = re.search(r'```(?:json)?\s*([\[\{].*?[\]\}])\s*```', raw, re.DOTALL)
+        if match:
+            raw = match.group(1)
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
+async def _fetch_readme_content(repo: str, token: str) -> str:
+    """Fetch full README.md content from GitHub (direct API, no @tool)."""
+    headers = _gh_headers(token)
+    headers["Accept"] = "application/vnd.github.v3.raw"
+
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        for filename in ("README.md", "readme.md", "Readme.md"):
+            resp = await client.get(
+                f"https://api.github.com/repos/{repo}/contents/{filename}",
+                headers=headers, timeout=15,
+            )
+            if resp.status_code == 200:
+                return resp.text[:8000]
+    return ""
 
 
 async def _fetch_rejected_patterns(repo: str, token: str, max_prs: int = 30) -> list[dict]:
@@ -664,6 +745,597 @@ async def eval_outcome_metrics(repo_ids: dict[str, int]) -> EvalResult:
 
 
 # ---------------------------------------------------------------------------
+# Eval 7: Domain Knowledge Extraction (5 sub-evals)
+# ---------------------------------------------------------------------------
+
+_DOMAIN_CATEGORIES = {"domain", "design", "product"}
+
+
+async def _get_domain_rules_by_repo(repo_ids: dict[str, int]) -> dict[str, list[dict]]:
+    """Fetch domain/design/product rules per repo. Returns {full_name: [rules]}."""
+    result: dict[str, list[dict]] = {}
+    for owner, name in REPOS:
+        full = repo_full_name(owner, name)
+        rid = repo_ids.get(full)
+        if rid is None:
+            result[full] = []
+            continue
+        rules = await db.list_rules(repo_id=rid)
+        domain = [r for r in rules if r.get("category") in _DOMAIN_CATEGORIES]
+        result[full] = domain
+    return result
+
+
+async def _get_all_rules_by_repo(repo_ids: dict[str, int]) -> dict[str, list[dict]]:
+    """Fetch all rules per repo. Returns {full_name: [rules]}."""
+    result: dict[str, list[dict]] = {}
+    for owner, name in REPOS:
+        full = repo_full_name(owner, name)
+        rid = repo_ids.get(full)
+        if rid is None:
+            result[full] = []
+            continue
+        rules = await db.list_rules(repo_id=rid)
+        result[full] = rules
+    return result
+
+
+# -- Sub-Eval 7a: Content Quality (LLM-as-Judge) -- Weight 0.30 --
+
+async def _eval_7a_content_quality(domain_by_repo: dict[str, list[dict]]) -> tuple[float, dict]:
+    """Score domain rules on specificity and actionability via LLM judge."""
+    system_prompt = (
+        "You evaluate software knowledge rules for quality. "
+        "For each rule, score on two dimensions (1-5 each):\n"
+        "- Specificity: Does it name project-specific entities, APIs, patterns? "
+        "(5=highly specific, 1=generic platitude)\n"
+        "- Actionability: Can a developer follow this without extra context? "
+        "(5=immediately actionable, 1=vague)\n\n"
+        "Return ONLY a JSON array: [{\"index\": 0, \"specificity\": N, \"actionability\": N}, ...]"
+    )
+
+    per_repo: dict[str, dict] = {}
+    repo_scores: list[float] = []
+
+    for full, rules in domain_by_repo.items():
+        if not rules:
+            per_repo[full] = {"skipped": True, "reason": "no domain rules"}
+            continue
+
+        # Deterministic sample: sorted by id, first 10
+        sampled = sorted(rules, key=lambda r: r.get("id", 0))[:10]
+        numbered = "\n".join(
+            f"{i}. [{r.get('category', '?')}] {r.get('rule_text', '')}"
+            for i, r in enumerate(sampled)
+        )
+        user_prompt = (
+            f"Rate each of these {len(sampled)} knowledge rules extracted from the "
+            f"{full} repository:\n\n{numbered}"
+        )
+
+        raw = await _llm_judge(system_prompt, user_prompt)
+        parsed = _parse_json_from_llm(raw)
+
+        if isinstance(parsed, list) and len(parsed) > 0:
+            rule_scores = []
+            for item in parsed:
+                if isinstance(item, dict):
+                    spec = item.get("specificity", 3)
+                    act = item.get("actionability", 3)
+                    rule_scores.append(((spec + act) / 2) / 5.0)
+            avg = sum(rule_scores) / len(rule_scores) if rule_scores else 0.5
+            per_repo[full] = {
+                "rules_sampled": len(sampled),
+                "avg_specificity": round(sum(i.get("specificity", 3) for i in parsed if isinstance(i, dict)) / max(len(parsed), 1), 2),
+                "avg_actionability": round(sum(i.get("actionability", 3) for i in parsed if isinstance(i, dict)) / max(len(parsed), 1), 2),
+                "score": round(avg, 3),
+            }
+            repo_scores.append(avg)
+            print(f"  [7a quality] {full}: {per_repo[full]['avg_specificity']}/5 spec, {per_repo[full]['avg_actionability']}/5 act -> {avg:.2f}")
+        else:
+            # LLM call failed — neutral score
+            per_repo[full] = {"rules_sampled": len(sampled), "llm_failed": True, "score": 0.5}
+            repo_scores.append(0.5)
+            print(f"  [7a quality] {full}: LLM judge failed, using 0.5")
+
+    score = sum(repo_scores) / len(repo_scores) if repo_scores else 0.0
+    return score, {"per_repo": per_repo}
+
+
+# -- Sub-Eval 7b: Domain Coverage (LLM Holistic) -- Weight 0.25 --
+
+async def _eval_7b_domain_coverage(domain_by_repo: dict[str, list[dict]]) -> tuple[float, dict]:
+    """Score how well extracted rules cover the project's domain concepts."""
+    system_prompt = (
+        "You are evaluating domain knowledge extraction quality. "
+        "Rate the extraction on a scale of 1-10 for:\n"
+        "- Completeness: How many of the project's key domain concepts, entities, "
+        "and terminology are captured?\n"
+        "- Depth: Do the rules go beyond surface-level descriptions to capture "
+        "relationships, constraints, and rationale?\n\n"
+        "Return ONLY a JSON object: {\"completeness\": N, \"depth\": N}"
+    )
+
+    per_repo: dict[str, dict] = {}
+    repo_scores: list[float] = []
+
+    for full, rules in domain_by_repo.items():
+        if not rules:
+            per_repo[full] = {"skipped": True, "reason": "no domain rules"}
+            continue
+
+        # Fetch README as ground truth context
+        readme = await _fetch_readme_content(full, TOKEN)
+        context_label = "README" if readme else "repo name only"
+        context_text = readme[:5000] if readme else f"Repository: {full}"
+
+        numbered_rules = "\n".join(
+            f"- [{r.get('category', '?')}] {r.get('rule_text', '')}"
+            for r in rules[:20]
+        )
+        user_prompt = (
+            f"Given this project's {context_label}:\n---\n{context_text}\n---\n\n"
+            f"Here are the domain/design/product rules extracted by an AI system "
+            f"({len(rules)} total, showing up to 20):\n{numbered_rules}\n\n"
+            f"Rate the extraction quality."
+        )
+
+        raw = await _llm_judge(system_prompt, user_prompt)
+        parsed = _parse_json_from_llm(raw)
+
+        if isinstance(parsed, dict) and "completeness" in parsed:
+            completeness = parsed.get("completeness", 5)
+            depth = parsed.get("depth", 5)
+            avg = ((completeness + depth) / 2) / 10.0
+            per_repo[full] = {
+                "rules_count": len(rules),
+                "has_readme": bool(readme),
+                "completeness": completeness,
+                "depth": depth,
+                "score": round(avg, 3),
+            }
+            repo_scores.append(avg)
+            print(f"  [7b coverage] {full}: completeness={completeness}/10, depth={depth}/10 -> {avg:.2f}")
+        else:
+            per_repo[full] = {"rules_count": len(rules), "llm_failed": True, "score": 0.5}
+            repo_scores.append(0.5)
+            print(f"  [7b coverage] {full}: LLM judge failed, using 0.5")
+
+    score = sum(repo_scores) / len(repo_scores) if repo_scores else 0.0
+    return score, {"per_repo": per_repo}
+
+
+# -- Sub-Eval 7c: Confidence Calibration -- Weight 0.15 --
+
+async def _eval_7c_confidence_calibration(
+    domain_by_repo: dict[str, list[dict]],
+    all_rules_by_repo: dict[str, list[dict]],
+) -> tuple[float, dict]:
+    """Check if confidence scores follow documented calibration rules."""
+    per_repo: dict[str, dict] = {}
+    repo_scores: list[float] = []
+
+    for full, domain_rules in domain_by_repo.items():
+        all_rules = all_rules_by_repo.get(full, [])
+        code_rules = [r for r in all_rules if r.get("category") not in _DOMAIN_CATEGORIES]
+
+        if not domain_rules:
+            per_repo[full] = {"skipped": True, "reason": "no domain rules"}
+            continue
+
+        domain_confs = [r.get("confidence", 0.8) for r in domain_rules]
+        code_confs = [r.get("confidence", 0.8) for r in code_rules] if code_rules else [0.8]
+
+        domain_avg = sum(domain_confs) / len(domain_confs)
+        code_avg = sum(code_confs) / len(code_confs)
+
+        # Domain should average lower than code (softer evidence)
+        calibrated = domain_avg <= code_avg
+
+        # Confidence values should be differentiated (not all identical)
+        conf_spread = statistics.stdev(domain_confs) if len(domain_confs) >= 2 else 0.0
+        differentiated = conf_spread > 0.03
+
+        # No domain rule should have confidence > 0.95
+        no_ceiling = all(c <= 0.95 for c in domain_confs)
+
+        repo_score = (calibrated * 0.5) + (differentiated * 0.3) + (no_ceiling * 0.2)
+        per_repo[full] = {
+            "domain_avg_conf": round(domain_avg, 3),
+            "code_avg_conf": round(code_avg, 3),
+            "conf_spread": round(conf_spread, 4),
+            "calibrated": calibrated,
+            "differentiated": differentiated,
+            "no_ceiling": no_ceiling,
+            "score": round(repo_score, 3),
+        }
+        repo_scores.append(repo_score)
+        print(f"  [7c calibration] {full}: domain_avg={domain_avg:.2f} vs code={code_avg:.2f}, spread={conf_spread:.3f} -> {repo_score:.2f}")
+
+    score = sum(repo_scores) / len(repo_scores) if repo_scores else 0.0
+    return score, {"per_repo": per_repo}
+
+
+# -- Sub-Eval 7d: Category Accuracy (LLM-as-Judge) -- Weight 0.15 --
+
+async def _eval_7d_category_accuracy(domain_by_repo: dict[str, list[dict]]) -> tuple[float, dict]:
+    """Test whether rules are classified into the correct category."""
+    system_prompt = (
+        "You classify software knowledge rules into exactly one of three categories:\n"
+        "- domain: Entity definitions, data models, API contracts, business rules, technical constraints\n"
+        "- design: UI conventions, design tokens, component patterns, accessibility, visual guidelines\n"
+        "- product: Product philosophy, personas, feature rationale, architectural WHY, user-facing decisions\n\n"
+        "For each rule, return its correct category.\n"
+        "Return ONLY a JSON array: [{\"index\": 0, \"category\": \"domain\"}, ...]"
+    )
+
+    per_repo: dict[str, dict] = {}
+    repo_scores: list[float] = []
+
+    for full, rules in domain_by_repo.items():
+        if not rules:
+            per_repo[full] = {"skipped": True, "reason": "no domain rules"}
+            continue
+
+        sampled = sorted(rules, key=lambda r: r.get("id", 0))[:10]
+        numbered = "\n".join(
+            f"{i}. {r.get('rule_text', '')}"
+            for i, r in enumerate(sampled)
+        )
+        user_prompt = (
+            f"Classify each of these {len(sampled)} rules from the {full} repository "
+            f"into domain, design, or product:\n\n{numbered}"
+        )
+
+        raw = await _llm_judge(system_prompt, user_prompt)
+        parsed = _parse_json_from_llm(raw)
+
+        if isinstance(parsed, list) and len(parsed) > 0:
+            matches = 0
+            total = min(len(parsed), len(sampled))
+            for item in parsed:
+                if not isinstance(item, dict):
+                    continue
+                idx = item.get("index", -1)
+                llm_cat = item.get("category", "")
+                if 0 <= idx < len(sampled) and llm_cat == sampled[idx].get("category"):
+                    matches += 1
+            accuracy = matches / total if total > 0 else 0.0
+            per_repo[full] = {
+                "rules_sampled": len(sampled),
+                "matches": matches,
+                "total_judged": total,
+                "accuracy": round(accuracy, 3),
+            }
+            repo_scores.append(accuracy)
+            print(f"  [7d category] {full}: {matches}/{total} correct -> {accuracy:.2f}")
+        else:
+            per_repo[full] = {"rules_sampled": len(sampled), "llm_failed": True, "score": 0.5}
+            repo_scores.append(0.5)
+            print(f"  [7d category] {full}: LLM judge failed, using 0.5")
+
+    score = sum(repo_scores) / len(repo_scores) if repo_scores else 0.0
+    return score, {"per_repo": per_repo}
+
+
+# -- Sub-Eval 7e: DB Schema Self-Test -- Weight 0.15 --
+
+_EXPECTED_SCHEMA_FACTS = [
+    ("knowledge_rules", "foreign key", "repositories"),
+    ("outcome_metrics", "UNIQUE", "repo_id"),
+    ("mined_sessions", "UNIQUE", "path"),
+    ("proposals", "status", "pending"),
+    ("created_at", "timestamp", "datetime"),
+]
+
+
+async def _eval_7e_db_schema_selftest() -> tuple[float, dict]:
+    """Test db-schema-analyzer against Tacit's own SQLite DB."""
+    db_path = str(Path(__file__).parent / "tacit.db")
+    details: dict = {}
+
+    # Create a temporary repo record for this self-test
+    temp_repo_id = None
+    try:
+        repo_dict = await db.create_repo("tacit", "tacit-db")
+        temp_repo_id = repo_dict["id"]
+    except Exception:
+        # May already exist from a previous run
+        repos = await db.list_repos()
+        for r in repos:
+            if r.get("full_name") == "tacit/tacit-db":
+                temp_repo_id = r["id"]
+                break
+
+    if temp_repo_id is None:
+        details["error"] = "Could not create temp repo for self-test"
+        print("  [7e db-schema] Could not create temp repo")
+        return 0.0, details
+
+    # Run db-schema-analyzer agent against tacit.db
+    prompt = (
+        f"Analyze the SQLite database at path '{db_path}'. "
+        f"Use db_connect to connect, then db_inspect_schema to understand the schema, "
+        f"then db_sample_data to see example rows. "
+        f"Extract domain knowledge about the data model, relationships, constraints, "
+        f"and entity lifecycle. Store findings as knowledge rules with category='domain' "
+        f"and repo_id={temp_repo_id}. "
+        f"Connection string: sqlite:///{db_path}"
+    )
+
+    try:
+        agent_output = await _run_agent("db-schema-analyzer", prompt, repo_id=temp_repo_id)
+        details["agent_output_length"] = len(agent_output)
+        print(f"  [7e db-schema] Agent produced {len(agent_output)} chars of output")
+    except Exception as exc:
+        details["agent_error"] = str(exc)
+        print(f"  [7e db-schema] Agent failed: {exc}")
+        return 0.0, details
+
+    # Check extracted rules for expected schema facts
+    extracted_rules = await db.list_rules(repo_id=temp_repo_id)
+    rule_texts = " ".join(r.get("rule_text", "").lower() for r in extracted_rules)
+
+    facts_found = 0
+    fact_results: list[dict] = []
+    for table, concept, related in _EXPECTED_SCHEMA_FACTS:
+        # Check if any extracted rule mentions the key terms
+        found = (
+            table.lower() in rule_texts
+            and (concept.lower() in rule_texts or related.lower() in rule_texts)
+        )
+        fact_results.append({
+            "table": table, "concept": concept, "related": related, "found": found,
+        })
+        if found:
+            facts_found += 1
+
+    score = facts_found / len(_EXPECTED_SCHEMA_FACTS)
+    details.update({
+        "rules_extracted": len(extracted_rules),
+        "facts_found": facts_found,
+        "total_expected_facts": len(_EXPECTED_SCHEMA_FACTS),
+        "fact_results": fact_results,
+        "temp_repo_id": temp_repo_id,
+    })
+    print(f"  [7e db-schema] {facts_found}/{len(_EXPECTED_SCHEMA_FACTS)} schema facts found in {len(extracted_rules)} rules -> {score:.2f}")
+
+    return score, details
+
+
+# -- Composite Eval 7 --
+
+async def eval_domain_knowledge(repo_ids: dict[str, int]) -> EvalResult:
+    result = EvalResult("Domain Knowledge Extraction")
+    t0 = time.time()
+
+    # Pre-fetch rules for all sub-evals
+    domain_by_repo = await _get_domain_rules_by_repo(repo_ids)
+    all_rules_by_repo = await _get_all_rules_by_repo(repo_ids)
+
+    repos_with_domain = sum(1 for rules in domain_by_repo.values() if rules)
+    total_domain = sum(len(rules) for rules in domain_by_repo.values())
+    print(f"  [domain] {repos_with_domain}/{len(REPOS)} repos have domain rules ({total_domain} total)")
+
+    # Run sub-evals
+    print("\n  --- Sub-Eval 7a: Content Quality (LLM judge) ---")
+    score_7a, details_7a = await _eval_7a_content_quality(domain_by_repo)
+
+    print("\n  --- Sub-Eval 7b: Domain Coverage (LLM holistic) ---")
+    score_7b, details_7b = await _eval_7b_domain_coverage(domain_by_repo)
+
+    print("\n  --- Sub-Eval 7c: Confidence Calibration ---")
+    score_7c, details_7c = await _eval_7c_confidence_calibration(domain_by_repo, all_rules_by_repo)
+
+    print("\n  --- Sub-Eval 7d: Category Accuracy (LLM judge) ---")
+    score_7d, details_7d = await _eval_7d_category_accuracy(domain_by_repo)
+
+    print("\n  --- Sub-Eval 7e: DB Schema Self-Test ---")
+    score_7e, details_7e = await _eval_7e_db_schema_selftest()
+
+    # Composite score
+    score = (
+        0.30 * score_7a
+        + 0.25 * score_7b
+        + 0.15 * score_7c
+        + 0.15 * score_7d
+        + 0.15 * score_7e
+    )
+
+    result.score = score
+    result.details = {
+        "repos_with_domain_rules": repos_with_domain,
+        "total_domain_rules": total_domain,
+        "total_repos": len(REPOS),
+        "sub_evals": {
+            "7a_content_quality": {"weight": 0.30, "score": round(score_7a, 4), **details_7a},
+            "7b_domain_coverage": {"weight": 0.25, "score": round(score_7b, 4), **details_7b},
+            "7c_confidence_calibration": {"weight": 0.15, "score": round(score_7c, 4), **details_7c},
+            "7d_category_accuracy": {"weight": 0.15, "score": round(score_7d, 4), **details_7d},
+            "7e_db_schema_selftest": {"weight": 0.15, "score": round(score_7e, 4), **details_7e},
+        },
+    }
+    result.duration_seconds = time.time() - t0
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Eval 8: Ground Truth Recall
+# ---------------------------------------------------------------------------
+
+_GROUND_TRUTH_FILENAMES = ["CLAUDE.md", ".claude/CLAUDE.md", "AGENTS.md"]
+
+
+async def _fetch_ground_truth_content(repo: str, token: str) -> str:
+    """Fetch CLAUDE.md and AGENTS.md from a repo and concatenate as ground truth."""
+    headers = _gh_headers(token)
+    headers["Accept"] = "application/vnd.github.v3.raw"
+
+    parts: list[str] = []
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        for filename in _GROUND_TRUTH_FILENAMES:
+            resp = await client.get(
+                f"https://api.github.com/repos/{repo}/contents/{filename}",
+                headers=headers, timeout=15,
+            )
+            if resp.status_code == 200:
+                parts.append(f"=== {filename} ===\n{resp.text[:10000]}")
+    return "\n\n".join(parts)
+
+
+async def eval_ground_truth_recall(repo_ids: dict[str, int]) -> EvalResult:
+    """Eval 8: For repos with CLAUDE.md/AGENTS.md, measure what % of their
+    guidelines can be independently discovered from other sources (PRs, CI,
+    configs, code structure).
+
+    Method: post-hoc filter — exclude rules whose provenance_url mentions
+    CLAUDE.md or AGENTS.md, then use LLM-as-judge to compare remaining
+    independent rules against the actual ground truth content.
+    """
+    result = EvalResult("Ground Truth Recall")
+    t0 = time.time()
+
+    per_repo: dict[str, dict] = {}
+    repo_scores: list[float] = []
+
+    for owner, name in REPOS:
+        full = repo_full_name(owner, name)
+        rid = repo_ids.get(full)
+
+        if rid is None:
+            per_repo[full] = {"error": "no repo_id"}
+            print(f"  [gt-recall] {full}: skipped (no repo_id)")
+            continue
+
+        # Step 1: Fetch actual CLAUDE.md/AGENTS.md as ground truth
+        ground_truth = await _fetch_ground_truth_content(full, TOKEN)
+        if not ground_truth.strip():
+            per_repo[full] = {"skipped": True, "reason": "no CLAUDE.md or AGENTS.md found"}
+            print(f"  [gt-recall] {full}: skipped (no ground truth files)")
+            continue
+
+        # Step 2: Get ALL rules for this repo
+        all_rules = await db.list_rules(repo_id=rid)
+        if not all_rules:
+            per_repo[full] = {"skipped": True, "reason": "no rules extracted"}
+            print(f"  [gt-recall] {full}: skipped (no rules)")
+            continue
+
+        # Step 3: Filter out rules contaminated by ground truth
+        independent_rules = []
+        contaminated_count = 0
+        for rule in all_rules:
+            prov_url = (rule.get("provenance_url") or "").lower()
+            prov_summary = (rule.get("provenance_summary") or "").lower()
+            source_ref = (rule.get("source_ref") or "").lower()
+
+            is_contaminated = (
+                "claude.md" in prov_url
+                or "agents.md" in prov_url
+                or "claude.md" in prov_summary
+                or "agents.md" in prov_summary
+                or "claude.md" in source_ref
+                or "agents.md" in source_ref
+            )
+
+            if is_contaminated:
+                contaminated_count += 1
+            else:
+                independent_rules.append(rule)
+
+        if not independent_rules:
+            per_repo[full] = {
+                "total_rules": len(all_rules),
+                "contaminated": contaminated_count,
+                "independent": 0,
+                "score": 0.0,
+            }
+            repo_scores.append(0.0)
+            print(f"  [gt-recall] {full}: 0 independent rules (all {contaminated_count} from ground truth)")
+            continue
+
+        # Step 4: Format independent rules for LLM
+        numbered_rules = "\n".join(
+            f"{i+1}. [{r.get('source_type', '?')}/{r.get('category', '?')}] {r.get('rule_text', '')}"
+            for i, r in enumerate(independent_rules[:50])  # Cap at 50 to fit context
+        )
+
+        # Step 5: LLM judge — compare independent rules against ground truth
+        system_prompt = (
+            "You are a scoring judge. You receive ALL data inline — do NOT ask for more.\n"
+            "Compare the ground truth guidelines against independently discovered rules.\n"
+            "A 'match' means the essential point is conveyed, even if worded differently.\n"
+            "Count each distinct actionable guideline in the ground truth (skip headings, "
+            "structural text, and links — only count concrete rules/instructions).\n\n"
+            "You MUST respond with ONLY a JSON object, no other text:\n"
+            '{"total_guidelines": <int>, "matched": <int>, '
+            '"unmatched_examples": ["<guideline1>", ...], '
+            '"matched_examples": ["<guideline1>", ...]}'
+        )
+
+        user_prompt = (
+            f"GROUND TRUTH (team's documented guidelines):\n"
+            f"{ground_truth[:6000]}\n\n"
+            f"INDEPENDENTLY DISCOVERED RULES ({len(independent_rules)} rules from PRs/CI/configs/code):\n"
+            f"{numbered_rules}\n\n"
+            f"Score now. Return JSON only."
+        )
+
+        llm_response = await _llm_judge(system_prompt, user_prompt)
+        parsed = _parse_json_from_llm(llm_response) if llm_response else None
+
+        if isinstance(parsed, dict) and "total_guidelines" in parsed and "matched" in parsed:
+            total_gt = parsed["total_guidelines"]
+            matched = parsed["matched"]
+            recall = matched / max(total_gt, 1)
+            recall = min(recall, 1.0)  # Cap at 1.0
+
+            per_repo[full] = {
+                "total_rules": len(all_rules),
+                "contaminated": contaminated_count,
+                "independent": len(independent_rules),
+                "total_guidelines": total_gt,
+                "matched": matched,
+                "recall": round(recall, 4),
+                "unmatched_examples": parsed.get("unmatched_examples", [])[:5],
+                "matched_examples": parsed.get("matched_examples", [])[:5],
+                "score": recall,
+            }
+            repo_scores.append(recall)
+            print(
+                f"  [gt-recall] {full}: {matched}/{total_gt} guidelines recalled "
+                f"({recall*100:.0f}%) from {len(independent_rules)} independent rules "
+                f"({contaminated_count} excluded as contaminated)"
+            )
+        else:
+            # LLM failed — use fallback score
+            per_repo[full] = {
+                "total_rules": len(all_rules),
+                "contaminated": contaminated_count,
+                "independent": len(independent_rules),
+                "llm_failed": True,
+                "score": 0.5,
+            }
+            repo_scores.append(0.5)
+            print(f"  [gt-recall] {full}: LLM judge failed, using 0.5 ({len(independent_rules)} independent rules)")
+
+    if repo_scores:
+        result.score = sum(repo_scores) / len(repo_scores)
+    else:
+        result.score = 0.0
+
+    result.details = {
+        "repos_with_ground_truth": sum(1 for r in per_repo.values() if not r.get("skipped")),
+        "total_repos": len(REPOS),
+        "avg_recall": round(result.score, 4),
+        "per_repo": per_repo,
+    }
+
+    result.duration_seconds = time.time() - t0
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Report
 # ---------------------------------------------------------------------------
 
@@ -710,6 +1382,34 @@ def print_report(results: list[EvalResult]) -> float:
             print(f"   Successful extractions: {d.get('successful_extractions', 0)}/{d.get('total_attempts', 0)}")
         elif r.name == "Outcome Metrics Collection":
             print(f"   Repos with valid metrics: {d.get('repos_with_valid_metrics', 0)}/{d.get('total_repos', 0)}")
+        elif r.name == "Domain Knowledge Extraction":
+            print(f"   Repos with domain rules: {d.get('repos_with_domain_rules', 0)}/{d.get('total_repos', 0)}")
+            print(f"   Total domain rules: {d.get('total_domain_rules', 0)}")
+            subs = d.get("sub_evals", {})
+            for key, label in [
+                ("7a_content_quality", "Content Quality"),
+                ("7b_domain_coverage", "Domain Coverage"),
+                ("7c_confidence_calibration", "Confidence Calibration"),
+                ("7d_category_accuracy", "Category Accuracy"),
+                ("7e_db_schema_selftest", "DB Schema Self-Test"),
+            ]:
+                sub = subs.get(key, {})
+                sub_pct = round(sub.get("score", 0) * 100)
+                weight = sub.get("weight", 0)
+                print(f"   {label:.<30s} {sub_pct:>3d}% (weight {weight})")
+        elif r.name == "Ground Truth Recall":
+            print(f"   Repos with ground truth: {d.get('repos_with_ground_truth', 0)}/{d.get('total_repos', 0)}")
+            print(f"   Average recall: {d.get('avg_recall', 0)*100:.0f}%")
+            pr = d.get("per_repo", {})
+            for repo_name, repo_data in pr.items():
+                if isinstance(repo_data, dict) and not repo_data.get("skipped"):
+                    recall = repo_data.get("recall", repo_data.get("score", 0))
+                    matched = repo_data.get("matched", "?")
+                    total_gt = repo_data.get("total_guidelines", "?")
+                    indep = repo_data.get("independent", "?")
+                    contam = repo_data.get("contaminated", "?")
+                    short_name = repo_name.split("/")[-1]
+                    print(f"   {short_name:.<25s} {recall*100 if isinstance(recall, float) else 0:>3.0f}% ({matched}/{total_gt} matched, {indep} independent, {contam} excluded)")
 
         print(f"   Duration: {r.duration_seconds:.1f}s")
         print(f"   SCORE: {pct}%")
@@ -856,6 +1556,34 @@ async def main():
         r6 = EvalResult("Outcome Metrics Collection")
         r6.error = str(exc)
         results.append(r6)
+        print(f"  FATAL ERROR: {exc}")
+        traceback.print_exc()
+
+    # Eval 7: Domain Knowledge
+    print("\n" + "=" * 60)
+    print("EVAL 7: Domain Knowledge Extraction")
+    print("=" * 60)
+    try:
+        r7 = await eval_domain_knowledge(repo_ids)
+        results.append(r7)
+    except Exception as exc:
+        r7 = EvalResult("Domain Knowledge Extraction")
+        r7.error = str(exc)
+        results.append(r7)
+        print(f"  FATAL ERROR: {exc}")
+        traceback.print_exc()
+
+    # Eval 8: Ground Truth Recall
+    print("\n" + "=" * 60)
+    print("EVAL 8: Ground Truth Recall")
+    print("=" * 60)
+    try:
+        r8 = await eval_ground_truth_recall(repo_ids)
+        results.append(r8)
+    except Exception as exc:
+        r8 = EvalResult("Ground Truth Recall")
+        r8.error = str(exc)
+        results.append(r8)
         print(f"  FATAL ERROR: {exc}")
         traceback.print_exc()
 

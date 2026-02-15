@@ -1,0 +1,106 @@
+{
+  "repo": "openclaw/openclaw",
+  "total_rules": 158,
+  "by_source": {
+    "docs": 111,
+    "config": 22,
+    "ci_fix": 1,
+    "pr": 14,
+    "anti_pattern": 10
+  },
+  "novel_discoveries": 47,
+  "anti_pattern_heroes": 10,
+  "never_rules": 13,
+  "hero_rules": [
+    {
+      "rule_text": "NEVER commit local config files (`.tmp/**`, `openclaw.json` snapshots) that contain live `gateway.auth.token` values or machine-specific absolute paths \u2014 these leak reusable secrets into repository history and bake in developer-local paths. Add `.tmp/` to .gitignore and rotate any leaked tokens imme",
+      "source_type": "anti_pattern",
+      "confidence": 0.95,
+      "provenance_url": "https://github.com/openclaw/openclaw/pull/15715",
+      "provenance_summary": "A WIP PR committed .tmp/dev/openclaw.json containing a live gateway.auth.token and machine-specific absolute paths (/Users/jarvis/...). Both automated reviewers flagged this as a secret leak. The toke",
+      "applicable_paths": ".tmp/**,**/openclaw.json",
+      "demo_score": 8.4
+    },
+    {
+      "rule_text": "NEVER delete only the first legacy key match during session store migration \u2014 delete ALL case-variant legacy keys in a single pass using `findStoreKeysIgnoreCase()`. Deleting only one leaves ghost duplicates behind, causing sessions.list to show phantom entries. This applies to all write paths: agen",
+      "source_type": "anti_pattern",
+      "confidence": 0.93,
+      "provenance_url": "https://github.com/openclaw/openclaw/pull/12846",
+      "provenance_summary": "Multiple write paths (agent, node-events, sessions) only deleted the first legacy case-variant key, leaving ghost duplicates in the session store. Reviewers flagged this in 4 separate comments across ",
+      "applicable_paths": "src/gateway/server-methods/**/*.ts,src/gateway/server-node-events.ts,src/gateway/sessions-resolve.ts",
+      "demo_score": 8.4
+    },
+    {
+      "rule_text": "NEVER use raw `.toLowerCase()` to canonicalize session keys or identifiers \u2014 use the dedicated canonicalization functions (`canonicalizeSpawnedByForAgent()`, `resolveSessionStoreKey()`, etc.). Raw lowercasing bypasses sentinel handling (`global`/`unknown`), the `agent:` prefix logic, bare name norma",
+      "source_type": "anti_pattern",
+      "confidence": 0.92,
+      "provenance_url": "https://github.com/openclaw/openclaw/pull/12846",
+      "provenance_summary": "PR author used raw .toLowerCase() to normalize session keys in agent.ts instead of the canonical session-key helpers. Reviewers caught that this breaks sentinel handling, agent: prefix logic, and main",
+      "applicable_paths": "src/gateway/**/*.ts",
+      "demo_score": 8.4
+    },
+    {
+      "rule_text": "NEVER commit `package-lock.json` in this repository \u2014 the project uses pnpm and relies on `pnpm-lock.yaml`. Adding an npm lockfile creates conflicting dependency sources and CI drift. If `package-lock.json` appears, it was generated accidentally by running `npm install` instead of `pnpm install`. (c",
+      "source_type": "anti_pattern",
+      "confidence": 0.9,
+      "provenance_url": "https://github.com/openclaw/openclaw/pull/15715",
+      "provenance_summary": "A PR added a 14k-line package-lock.json to a pnpm-managed repo, creating conflicting lockfiles. Reviewer flagged this as accidental npm usage that would cause CI drift and dependency confusion.",
+      "applicable_paths": "package-lock.json",
+      "demo_score": 8.4
+    },
+    {
+      "rule_text": "NEVER allow `register()` or similar Map-based pending-entry methods to silently overwrite existing entries with the same ID \u2014 this strands the original request's promise/timer and can deliver decisions to the wrong waiter. Always guard with an existence check: return the existing entry's promise if ",
+      "source_type": "anti_pattern",
+      "confidence": 0.9,
+      "provenance_url": "https://github.com/openclaw/openclaw/pull/3357",
+      "provenance_summary": "ExecApprovalManager.register() unconditionally overwrote pending Map entries, stranding original promises/timers. Reviewer also flagged that register() could throw on duplicate IDs without a try/catch",
+      "applicable_paths": "src/gateway/exec-approval-manager.ts,src/gateway/server-methods/exec-approval.ts",
+      "demo_score": 8.4
+    },
+    {
+      "rule_text": "NEVER return timeout/null decisions as successful responses \u2014 callers cannot distinguish between \"timed out\" and \"explicitly allowed/denied.\" When an async operation resolves to `null` due to timeout, return an explicit error or a distinct status field (e.g., `{ status: \"timeout\", decision: null }`)",
+      "source_type": "anti_pattern",
+      "confidence": 0.9,
+      "provenance_url": "https://github.com/openclaw/openclaw/pull/3357",
+      "provenance_summary": "exec.approval.request returned {decision: null} on timeout as a success response, while exec.approval.waitDecision treated the same case as an error. Reviewer flagged the inconsistency multiple times ",
+      "applicable_paths": "src/gateway/server-methods/**/*.ts,src/gateway/exec-approval-manager.ts",
+      "demo_score": 8.4
+    },
+    {
+      "rule_text": "NEVER use shallow object spread (`{ ...base, ...override }`) to merge config objects with nested fields \u2014 per-account or per-feature overrides will silently replace entire nested objects instead of merging individual fields. Example: base `dm: { policy: \"pairing\", allowFrom: [...] }` + account overr",
+      "source_type": "anti_pattern",
+      "confidence": 0.88,
+      "provenance_url": "https://github.com/openclaw/openclaw/pull/7286",
+      "provenance_summary": "Matrix multi-account config used shallow spread to merge per-account overrides with base config, silently dropping nested fields like dm.policy when only dm.allowFrom was overridden. Reviewer noted th",
+      "applicable_paths": "src/config/**/*.ts,extensions/**/config.ts",
+      "demo_score": 8.4
+    },
+    {
+      "rule_text": "NEVER normalize identifiers (account IDs, keys) without deduplicating the result \u2014 if config contains keys like `Assistant` and `assistant` that normalize to the same value, the system will attempt to start the same logical entity twice, causing Map collisions, credential overwrites, and runtime cra",
+      "source_type": "anti_pattern",
+      "confidence": 0.88,
+      "provenance_url": "https://github.com/openclaw/openclaw/pull/7286",
+      "provenance_summary": "listConfiguredAccountIds() normalized account keys but didn't deduplicate, so config keys 'Assistant' and 'assistant' both appeared as 'assistant', causing the gateway to start the same account twice ",
+      "applicable_paths": "extensions/matrix/**/*.ts,src/gateway/**/*.ts",
+      "demo_score": 8.4
+    },
+    {
+      "rule_text": "NEVER sanitize identifiers into filenames using simple character replacement (e.g., replacing non-alphanumeric chars with `_`) \u2014 distinct identifiers can collapse to the same filename (e.g., `a:b` and `a?b` both become `credentials-a_b.json`), causing credential overwrites and cross-account data lea",
+      "source_type": "anti_pattern",
+      "confidence": 0.85,
+      "provenance_url": "https://github.com/openclaw/openclaw/pull/7286",
+      "provenance_summary": "Matrix credentialsFilename() replaced non-alphanumeric chars with _ to sanitize account IDs, but this collapses distinct IDs to the same filename, potentially overwriting/sharing credentials across ac",
+      "applicable_paths": "extensions/matrix/**/*.ts",
+      "demo_score": 8.3
+    },
+    {
+      "rule_text": "NEVER include API-specific payload fields unconditionally \u2014 gate optional fields on the relevant type/mode. Example: Discord's `url` field in activity payloads is only valid for `type: 1` (Streaming); including it for other activity types causes the presence payload to be rejected or silently ignore",
+      "source_type": "anti_pattern",
+      "confidence": 0.85,
+      "provenance_url": "https://github.com/openclaw/openclaw/pull/10855",
+      "provenance_summary": "Discord presence update always included the url field in activity payloads regardless of activity type. Reviewer flagged that Discord only permits url for Streaming (type 1) and other types would be r",
+      "applicable_paths": "src/discord/**/*.ts",
+      "demo_score": 8.3
+    }
+  ]
+}

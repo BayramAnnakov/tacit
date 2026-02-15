@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #0D1117; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+  background-image: url('bg-dark.png');
+  background-size: cover;
+}
+.top-bar { height: 4pt; background: #00D4AA; width: 100%; }
+.content { flex: 1; padding: 28pt 40pt; display: flex; flex-direction: column; }
+h2 { color: #00D4AA; font-size: 26pt; margin: 0 0 14pt 0; }
+.two-col { display: flex; flex: 1; gap: 30pt; }
+.col { flex: 1; }
+.pain-box {
+  background: rgba(248, 81, 73, 0.08);
+  border-left: 4pt solid #F85149;
+  padding: 10pt 14pt;
+  margin-bottom: 8pt;
+  border-radius: 0 6pt 6pt 0;
+}
+.pain-title { color: #F85149; font-size: 13pt; font-weight: bold; margin: 0 0 4pt 0; }
+.pain-desc { color: #8B949E; font-size: 11pt; margin: 0; }
+.stat-box {
+  background: rgba(0, 212, 170, 0.08);
+  border: 1px solid rgba(0, 212, 170, 0.2);
+  border-radius: 8pt;
+  padding: 12pt;
+  margin-bottom: 8pt;
+}
+.stat-num { color: #00D4AA; font-size: 28pt; font-weight: bold; margin: 0; }
+.stat-label { color: #8B949E; font-size: 11pt; margin: 4pt 0 0 0; }
+</style>
+</head>
+<body>
+<div class="top-bar"></div>
+<div class="content">
+  <h2>The Problem</h2>
+  <div class="two-col">
+    <div class="col">
+      <div class="pain-box">
+        <p class="pain-title">Tribal Knowledge</p>
+        <p class="pain-desc">Rules that exist only in people's heads: "don't commit package-lock in a pnpm repo"</p>
+      </div>
+      <div class="pain-box">
+        <p class="pain-title">Learned by Failing</p>
+        <p class="pain-desc">New developers discover conventions by making mistakes and getting PRs rejected</p>
+      </div>
+      <div class="pain-box">
+        <p class="pain-title">Lost in PR Reviews</p>
+        <p class="pain-desc">Critical knowledge buried in thousands of review comments nobody reads again</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="stat-box">
+        <p class="stat-num">70%</p>
+        <p class="stat-label">of team conventions are undocumented</p>
+      </div>
+      <div class="stat-box">
+        <p class="stat-num">30%</p>
+        <p class="stat-label">of PR review cycles are for already-known rules</p>
+      </div>
+      <div class="stat-box">
+        <p class="stat-num">0</p>
+        <p class="stat-label">tools that extract rules FROM code reviews</p>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

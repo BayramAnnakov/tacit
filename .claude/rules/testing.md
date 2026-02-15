@@ -25,11 +25,11 @@ python eval_extract.py
 
 ## Eval Suite v2 (New V2 Capabilities)
 
-Tests 6 capabilities added in v2. Each eval scores 0.0–1.0, averaged for overall score.
+Tests 8 capabilities added in v2. Each eval scores 0.0–1.0, averaged for overall score.
 
 ```bash
 cd tacit/backend && source venv/bin/activate
-python eval_v2.py                    # Full eval (extraction + all 6 evals)
+python eval_v2.py                    # Full eval (extraction + all 8 evals)
 python eval_v2.py --skip-extraction  # Reuse existing DB, run evals only
 ```
 
@@ -58,6 +58,15 @@ Simulates single-PR extraction via `incremental_extract()`. Finds a PR number fr
 ### Eval 6: Outcome Metrics Collection
 Runs `collect_outcome_metrics()` per repo. Validates 4 fields (total_prs, avg_review_rounds, ci_failure_rate, avg_time_to_merge_hours) are present and within reasonable bounds.
 - Score = repos_with_valid_metrics / total_repos
+
+### Eval 7: Domain Knowledge Extraction
+5 weighted sub-evals: content quality (LLM judge, 0.30), domain coverage (LLM holistic, 0.25), confidence calibration (0.15), category accuracy (LLM judge, 0.15), DB schema self-test (0.15).
+- Score = weighted composite of 5 sub-evals
+
+### Eval 8: Ground Truth Recall
+For repos with existing CLAUDE.md/AGENTS.md: filters out rules whose provenance_url mentions these files ("contaminated" rules), then uses LLM judge to measure what % of the ground truth guidelines were independently discovered from PRs, CI, configs, and code.
+- Score = avg recall across repos with ground truth files
+- This is the most honest measure of Tacit's discovery capability
 
 ### Passing Threshold
 Overall score >= 50% to pass (exit code 0). Below 50% exits with code 1.
