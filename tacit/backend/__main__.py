@@ -74,6 +74,12 @@ async def main() -> int:
         help="Skip extraction, just generate from existing knowledge base",
     )
     parser.add_argument(
+        "--max-prs",
+        type=int,
+        default=20,
+        help="Maximum PRs to analyze (default: 20, was 10 in v2)",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         dest="json_output",
@@ -122,7 +128,7 @@ async def main() -> int:
     if not args.skip_extract:
         _progress("Starting extraction pipeline...")
         rules_found = 0
-        async for event in run_extraction(args.repo, github_token):
+        async for event in run_extraction(args.repo, github_token, max_prs=args.max_prs):
             if event.event_type == "stage_change":
                 _progress(event.message)
             elif event.event_type == "rules_found":

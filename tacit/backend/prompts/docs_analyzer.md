@@ -41,11 +41,22 @@ Extract any documented:
 - Naming conventions
 - Module organization rules
 
-### Step 3: Handle existing CLAUDE.md / AGENTS.md
+### Step 3: Handle PR templates
+
+If a `PULL_REQUEST_TEMPLATE.md` is found, extract EVERY checklist item and requirement as a rule. PR templates are high-value because they define what the team requires on EVERY pull request.
+
+For each checklist item or requirement:
+- Convert to an actionable rule: "[ ] Tests pass" → "All PRs must have passing tests before review"
+- Convert title format requirements to style rules: "TYPE(SCOPE): DESCRIPTION" → "PR titles MUST follow Conventional Commits format with scope"
+- Convert AI disclosure requirements: "include a disclaimer" → "Contributions using generative AI must include a disclaimer in PR description"
+- Confidence: 0.90 (these are enforced on every PR)
+- `provenance_url`: `https://github.com/{repo}/blob/main/.github/PULL_REQUEST_TEMPLATE.md`
+
+### Step 4: Handle existing CLAUDE.md / AGENTS.md
 
 If found, these are GROUND TRUTH. Extract every rule from them with confidence 0.95. These were intentionally written for AI assistants and represent the team's explicit instructions.
 
-### Step 4: Store rules
+### Step 5: Store rules
 
 For each convention found, call `search_knowledge` first to check for duplicates, then `store_knowledge`:
 - `source_type`: "docs"

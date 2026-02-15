@@ -314,6 +314,8 @@ async def github_fetch_docs(args: dict) -> dict:
         "docs/CONTRIBUTING.md",
         "docs/contributing.md",
         ".github/CONTRIBUTING.md",
+        ".github/PULL_REQUEST_TEMPLATE.md",
+        ".github/pull_request_template.md",
     ]
 
     if exclude_gt:

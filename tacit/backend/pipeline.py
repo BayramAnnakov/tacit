@@ -64,7 +64,8 @@ async def _run_agent(
 
 
 async def run_extraction(
-    repo: str, github_token: str, run_id: int | None = None, *, exclude_ground_truth: bool = False,
+    repo: str, github_token: str, run_id: int | None = None, *,
+    exclude_ground_truth: bool = False, max_prs: int = 20,
 ) -> AsyncIterator[ExtractionEvent]:
     """Orchestrate the multi-source extraction pipeline.
 
@@ -139,9 +140,9 @@ async def run_extraction(
 
         scanner_prompt = (
             f"Scan the GitHub repository '{repo}' for knowledge-rich pull requests. "
-            f"Use the github_fetch_prs tool with github_token='{github_token}', repo='{repo}', per_page=50. "
+            f"Use the github_fetch_prs tool with github_token='{github_token}', repo='{repo}', per_page=100. "
             f"Prioritize first-timer PRs and PRs with CHANGES_REQUESTED reviews. "
-            f"Return the top 10 most promising PRs as JSON."
+            f"Return the top {max_prs} most promising PRs as JSON."
         )
         scanner_result = await _run_agent("pr-scanner", scanner_prompt, repo_id)
 
@@ -166,7 +167,7 @@ async def run_extraction(
         # Analyze PR threads in parallel (up to 3 concurrent)
         sem = asyncio.Semaphore(3)
         pr_tasks = []
-        for pr_num in pr_numbers[:10]:
+        for pr_num in pr_numbers[:max_prs]:
             task = asyncio.create_task(
                 _analyze_single_pr(sem, repo, github_token, repo_id, pr_num)
             )

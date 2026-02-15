@@ -1263,14 +1263,19 @@ async def eval_ground_truth_recall(repo_ids: dict[str, int]) -> EvalResult:
         # Step 5: LLM judge — compare independent rules against ground truth
         system_prompt = (
             "You are a scoring judge. You receive ALL data inline — do NOT ask for more.\n"
-            "Compare the ground truth guidelines against independently discovered rules.\n"
-            "A 'match' means the essential point is conveyed, even if worded differently.\n"
+            "Compare the ground truth guidelines against independently discovered rules.\n\n"
+            "For each guideline in the ground truth, assign a match score:\n"
+            "- 1.0 = FULL MATCH: the essential point is conveyed, even if worded differently\n"
+            "- 0.5 = PARTIAL MATCH: the core concept is captured but specific details "
+            "(exact commands, exact values, exact thresholds) are missing\n"
+            "- 0.0 = NO MATCH: the guideline was not discovered at all\n\n"
             "Count each distinct actionable guideline in the ground truth (skip headings, "
             "structural text, and links — only count concrete rules/instructions).\n\n"
+            "'matched' should be the SUM of all match scores (can be fractional).\n\n"
             "You MUST respond with ONLY a JSON object, no other text:\n"
-            '{"total_guidelines": <int>, "matched": <int>, '
+            '{"total_guidelines": <int>, "matched": <float>, '
             '"unmatched_examples": ["<guideline1>", ...], '
-            '"matched_examples": ["<guideline1>", ...]}'
+            '"matched_examples": ["<guideline (score)>", ...]}'
         )
 
         user_prompt = (

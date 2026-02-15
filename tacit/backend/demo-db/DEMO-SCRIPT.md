@@ -62,7 +62,7 @@ python __main__.py openclaw/openclaw --skip-extract
 ## SLIDE 6: The Numbers (10 sec)
 
 **Say:**
-> "We tested Tacit against 7 major open-source repos: OpenClaw, Langchain, Deno, Prisma, Next.js, React, and Claude Code. 768 total rules extracted. Our eval suite scores 74% across 8 dimensions including content quality, provenance coverage, and ground truth recall. 30% of extracted rules are novel — not in any docs."
+> "We tested Tacit against 7 repos including Claude Code and Langchain. 768 total rules extracted. The headline number: 30% of extracted rules are NOVEL — conventions teams enforce in PR reviews but never wrote down. And every single rule links back to the exact PR conversation where the team learned it. That's the real value — surfacing knowledge your team doesn't know it has."
 
 ---
 
