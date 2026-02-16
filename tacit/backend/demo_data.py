@@ -383,35 +383,32 @@ DEMO_RULES: list[dict] = [
 
 # Simulated extraction timeline — each step has (delay_seconds, message, detail)
 EXTRACTION_TIMELINE: list[tuple[float, str, str]] = [
-    # Phase 1: Parallel analyzers
+    # Phase 1: Parallel analyzers (real costs from 50-PR openclaw extraction)
     (0.0, "phase", "\033[1;36m  Phase 1: Starting 6 parallel analyzers...\033[0m"),
-    (0.8, "agent", "\033[32m    ✓\033[0m structural-analyzer: 14 conventions from repo structure"),
-    (0.3, "agent", "\033[32m    ✓\033[0m docs-analyzer: 8 rules from CONTRIBUTING.md, README"),
-    (0.5, "agent", "\033[32m    ✓\033[0m code-analyzer: 12 rules from linter/test configs"),
-    (0.7, "agent", "\033[32m    ✓\033[0m domain-analyzer: 5 domain conventions from architecture docs"),
-    (1.0, "agent", "\033[32m    ✓\033[0m ci-failure-miner: 6 implicit rules from CI fix patterns"),
-    (1.2, "agent", "\033[32m    ✓\033[0m anti-pattern-miner: 10 \033[31m\"Do Not\"\033[0m rules from CHANGES_REQUESTED reviews"),
+    (0.8, "agent", "\033[32m    ✓\033[0m anti-pattern-miner: 7 \033[31m\"Do Not\"\033[0m rules from CHANGES_REQUESTED reviews \033[90m(74s, $0.19, opus)\033[0m"),
+    (0.3, "agent", "\033[32m    ✓\033[0m ci-failure-miner: 12 implicit rules from CI fix patterns \033[90m(81s, $0.12, opus)\033[0m"),
+    (0.5, "agent", "\033[32m    ✓\033[0m code-analyzer: 53 rules from linter/test/CI configs \033[90m(195s, $0.67, sonnet)\033[0m"),
+    (0.7, "agent", "\033[32m    ✓\033[0m structural-analyzer: 14 conventions from repo structure \033[90m(273s, $0.52, sonnet)\033[0m"),
+    (1.0, "agent", "\033[32m    ✓\033[0m domain-analyzer: 5 domain conventions from architecture docs \033[90m(368s, $1.41, sonnet)\033[0m"),
+    (1.2, "agent", "\033[32m    ✓\033[0m docs-analyzer: 196 rules from CONTRIBUTING.md, README, CLAUDE.md \033[90m(377s, $1.09, sonnet)\033[0m"),
     # Phase 2: PR thread analysis
-    (0.4, "phase", "\033[1;36m  Phase 2: Deep PR thread analysis...\033[0m"),
+    (0.4, "phase", "\033[1;36m  Phase 2: Deep PR thread analysis (5 concurrent)...\033[0m"),
     (0.6, "agent", "\033[90m    → Scanning 50 PRs for knowledge-rich discussions...\033[0m"),
-    (0.8, "agent", "\033[32m    ✓\033[0m pr-scanner: 23 PRs selected (first-timers, rejections, long threads)"),
-    (0.5, "agent", "\033[90m    → Analyzing PR #15715: \"Remove package-lock.json\"...\033[0m"),
-    (0.7, "agent", "\033[32m    ✓\033[0m thread-analyzer: 3 rules extracted \033[90m(provenance: PR #15715)\033[0m"),
-    (0.4, "agent", "\033[90m    → Analyzing PR #12669: \"Fix compute-and-discard pattern\"...\033[0m"),
-    (0.6, "agent", "\033[32m    ✓\033[0m thread-analyzer: 2 rules extracted \033[90m(provenance: PR #12669)\033[0m"),
-    (0.4, "agent", "\033[90m    → Analyzing PR #12846: \"Session store canonicalization\"...\033[0m"),
-    (0.7, "agent", "\033[32m    ✓\033[0m thread-analyzer: 4 rules extracted \033[90m(provenance: PR #12846)\033[0m"),
-    (0.3, "agent", "\033[90m    → Analyzing PR #7286: \"Matrix multi-account support\"...\033[0m"),
-    (0.6, "agent", "\033[32m    ✓\033[0m thread-analyzer: 3 rules extracted \033[90m(provenance: PR #7286)\033[0m"),
-    (0.2, "agent", "\033[90m    → ... analyzing 19 more PRs ...\033[0m"),
-    (1.5, "agent", "\033[32m    ✓\033[0m 23 PR threads analyzed, 42 rules extracted"),
+    (0.8, "agent", "\033[32m    ✓\033[0m pr-scanner: 49 PRs selected (first-timers, rejections, long threads) \033[90m(83s, $0.27, sonnet)\033[0m"),
+    (0.5, "agent", "\033[32m    ✓\033[0m thread-analyzer: PR #12655 \033[90m(43s, $0.16, opus)\033[0m"),
+    (0.4, "agent", "\033[32m    ✓\033[0m thread-analyzer: PR #12669 \033[90m(84s, $0.33, opus)\033[0m"),
+    (0.4, "agent", "\033[32m    ✓\033[0m thread-analyzer: PR #12846 \033[90m(60s, $0.20, opus)\033[0m"),
+    (0.3, "agent", "\033[32m    ✓\033[0m thread-analyzer: PR #15715 \033[90m(45s, $0.14, opus)\033[0m"),
+    (0.3, "agent", "\033[32m    ✓\033[0m thread-analyzer: PR #7286 \033[90m(42s, $0.14, opus)\033[0m"),
+    (0.2, "agent", "\033[90m    → ... analyzing 44 more PRs (5 concurrent) ...\033[0m"),
+    (1.5, "agent", "\033[32m    ✓\033[0m 49 PR threads analyzed, 75 rules extracted \033[90m($8.07 total, opus)\033[0m"),
     # Phase 3: Await
     (0.3, "phase", "\033[1;36m  Phase 3: Awaiting parallel tasks...\033[0m"),
     (0.5, "agent", "\033[32m    ✓\033[0m All 6 analyzers complete"),
     # Phase 4: Synthesis
     (0.3, "phase", "\033[1;36m  Phase 4: Cross-source synthesis...\033[0m"),
-    (1.0, "agent", "\033[32m    ✓\033[0m synthesizer: Merged 97 → 72 rules (dedup, confidence boosting)"),
-    (0.5, "agent", "\033[32m    ✓\033[0m Generic filter: Removed 5 platitudes \033[90m(3-layer filtering)\033[0m"),
+    (1.0, "agent", "\033[32m    ✓\033[0m synthesizer: Dedup + confidence boosting across sources \033[90m(119s, $0.76, opus)\033[0m"),
+    (0.5, "agent", "\033[32m    ✓\033[0m Generic filter: Removed platitudes \033[90m(3-layer filtering)\033[0m"),
     (0.3, "done", "\033[1;32m  ✓ Extraction complete: {total} rules found\033[0m"),
 ]
 

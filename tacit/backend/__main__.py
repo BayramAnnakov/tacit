@@ -91,13 +91,14 @@ def _print_cost(cost_data: dict) -> None:
     # Cost
     total_cost = cost_data.get("total_cost_usd", 0)
     if total_cost > 0:
-        parts.append(f"${total_cost:.2f}")
+        cost_str = f"${total_cost:.2f}"
         by_model = cost_data.get("by_model", {})
         if len(by_model) > 1:
             model_parts = []
             for model, model_cost in sorted(by_model.items(), key=lambda x: x[1], reverse=True):
                 model_parts.append(f"{model}: ${model_cost:.2f}")
-            parts.append(f"({', '.join(model_parts)})")
+            cost_str += f" ({', '.join(model_parts)})"
+        parts.append(cost_str)
 
     if parts:
         print(f"\033[90m  Pipeline: {' | '.join(parts)}\033[0m", file=sys.stderr)
