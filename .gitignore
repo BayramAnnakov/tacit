@@ -12,3 +12,4 @@ tacit/backend/tacit.db
 *.db-wal
 *.db.bak
 .firecrawl/
+*.egg-info/

@@ -9,6 +9,19 @@
 
 Tacit turns the invisible knowledge buried in code reviews and AI conversations into explicit, actionable team guidelines that Claude Code loads automatically.
 
+## Try It Now
+
+```bash
+# One-liner with uvx (Python's npx — no install needed):
+uvx --from "git+https://github.com/BayramAnnakov/tacit.git" tacit openclaw/openclaw --demo
+
+# Or with pip:
+pip install "git+https://github.com/BayramAnnakov/tacit.git"
+tacit openclaw/openclaw --demo
+```
+
+The `--demo` flag uses pre-loaded data from a real open-source project — no API keys required. You'll see the 16-agent extraction pipeline simulate in real-time, then get a summary of 40 rules with provenance links to actual PRs.
+
 ## The Problem
 
 Every team accumulates tacit knowledge — "we always validate inputs before processing", "use dependency injection for database connections", "test against non-POSIX shells". This knowledge lives scattered across PR comments, Slack threads, and individual developer memories. When new team members join or AI assistants help with code, this knowledge is lost.
@@ -18,59 +31,47 @@ Every team accumulates tacit knowledge — "we always validate inputs before pro
 1. **Connect** a GitHub repository
 2. **Extract** — 16 AI agents scan PRs, CI failures, docs, code configs, and domain docs in parallel
 3. **Browse** — Review discovered rules with confidence scores, provenance links, and decision trails
-4. **Propose** — Team members propose new rules from local Claude Code conversations
-5. **Review** — Approve or reject proposals; approved rules join the team knowledge base
-6. **Generate** — Export a monolithic CLAUDE.md or path-scoped `.claude/rules/` directory
-7. **Validate** — PR validator checks new PRs against learned rules and posts review comments with provenance
-8. **Learn continuously** — Webhook-driven incremental extraction from merged PRs
+4. **Generate** — Export a monolithic CLAUDE.md or path-scoped `.claude/rules/` directory
+5. **Validate** — PR validator checks new PRs against learned rules and posts review comments with provenance
+6. **Learn continuously** — Webhook-driven incremental extraction from merged PRs
 
 ## Architecture
 
 ```
-┌─────────────────────────────────┐
-│   SwiftUI macOS App (Swift 5.9) │
-│   Three-column NavigationSplit   │
-│   WebSocket live streaming       │
-└────────────┬────────────────────┘
-             │ REST + WebSocket
-┌────────────▼────────────────────┐
-│   FastAPI Backend (Python 3.10)  │
-│   SQLite + aiosqlite             │
-│   Claude Agent SDK (16 agents)   │
-│   20 MCP tools                   │
-└────────────┬────────────────────┘
+┌────────────────────────────────┐
+│   FastAPI Backend (Python 3.10) │
+│   SQLite + aiosqlite            │
+│   Claude Agent SDK (16 agents)  │
+│   20 MCP tools                  │
+└────────────┬───────────────────┘
              │
-┌────────────▼────────────────────┐
-│   Multi-Source Extraction        │
-│   Phase 1: 6 parallel analyzers  │
-│   Phase 2: PR thread analysis    │
-│   Phase 3: Await + gather        │
-│   Phase 4: Cross-source synthesis│
-│   (Claude Sonnet + Opus agents)  │
-└─────────────────────────────────┘
+┌────────────▼───────────────────┐
+│   Multi-Source Extraction       │
+│   Phase 1: 6 parallel analyzers │
+│   Phase 2: PR thread analysis   │
+│   Phase 3: Await + gather       │
+│   Phase 4: Cross-source synth.  │
+│   (Claude Sonnet + Opus agents) │
+└────────────────────────────────┘
 ```
 
-## CLI Tool
-
-Extract knowledge from any GitHub repo in a single command:
+## CLI
 
 ```bash
-cd tacit/backend && source venv/bin/activate
+# Demo mode (no API keys needed):
+tacit openclaw/openclaw --demo
 
-# Full extraction + generate CLAUDE.md
-python __main__.py owner/repo
+# Full extraction on any GitHub repo:
+tacit owner/repo
 
 # Quick summary: stats + top anti-patterns + PR-derived rules
-python __main__.py owner/repo --skip-extract --summary
+tacit owner/repo --skip-extract --summary
 
 # Generate modular .claude/rules/ files
-python __main__.py owner/repo --modular
+tacit owner/repo --modular
 
 # Write output to a directory
-python __main__.py owner/repo --modular --output ./my-project/
-
-# Reuse existing DB (instant generation)
-python __main__.py owner/repo --skip-extract
+tacit owner/repo --modular --output ./my-project/
 ```
 
 Example output from OpenClaw (a real open-source project with 15k+ PRs):
@@ -86,17 +87,31 @@ Example output from OpenClaw (a real open-source project with 15k+ PRs):
 
 ## Quick Start
 
-### Prerequisites
-- Python 3.10+
-- Anthropic API key (Claude Agent SDK)
-- GitHub personal access token
-
-### Backend Setup
+### Option 1: One-liner (demo mode, no API keys)
 
 ```bash
+uvx --from "git+https://github.com/BayramAnnakov/tacit.git" tacit openclaw/openclaw --demo
+```
+
+### Option 2: Full extraction (real repo)
+
+```bash
+pip install "git+https://github.com/BayramAnnakov/tacit.git[full]"
+
+# Set your API keys
+export ANTHROPIC_API_KEY=sk-ant-...
+export GITHUB_TOKEN=ghp_...
+
+# Extract knowledge from any GitHub repo
+tacit owner/repo --summary
+```
+
+### Option 3: From source (for development)
+
+```bash
+git clone https://github.com/BayramAnnakov/tacit.git && cd tacit
 cd tacit/backend
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv venv && source venv/bin/activate
 pip install -r ../requirements.txt
 
 # Create .env file
@@ -105,12 +120,15 @@ ANTHROPIC_API_KEY=sk-ant-...
 GITHUB_TOKEN=ghp_...
 EOF
 
-# Start the backend
-python main.py
-# → Running on http://127.0.0.1:8000
+# Run CLI
+python __main__.py owner/repo --summary
+
+# Or start the API server
+python main.py  # → http://127.0.0.1:8000
 ```
 
-### macOS Frontend (Optional)
+<details>
+<summary>macOS Frontend (Optional)</summary>
 
 ```bash
 cd tacit/TacitApp
@@ -118,15 +136,8 @@ swift build && swift run TacitApp
 # Or: open Package.swift  (Xcode)
 ```
 
-Requires macOS 14+ with Xcode 15+.
-
-### Demo Mode
-
-The backend seeds demo data on first launch:
-- 8 knowledge rules from `anthropics/claude-code`
-- 3 team proposals (from Alex and Sarah)
-- Decision trail entries showing rule evolution
-- Pre-connected repository
+Requires macOS 14+ with Xcode 15+. SwiftUI three-column app connects to the backend via REST + WebSocket.
+</details>
 
 ## Features
 

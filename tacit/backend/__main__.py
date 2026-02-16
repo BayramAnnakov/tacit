@@ -1,13 +1,15 @@
-"""CLI entry point: python -m tacit owner/repo
+"""CLI entry point: tacit owner/repo
 
 Zero-config single-command knowledge extraction.
 Runs the full pipeline and prints CLAUDE.md to stdout.
 
 Usage:
-    python -m tacit owner/repo                  # Extract + print CLAUDE.md
-    python -m tacit owner/repo --modular        # Extract + print .claude/rules/ files
-    python -m tacit owner/repo --output dir/    # Extract + write files to directory
-    python -m tacit owner/repo --skip-extract   # Reuse existing DB, just generate
+    tacit owner/repo                        # Extract + print CLAUDE.md
+    tacit owner/repo --demo                 # Demo mode (no API keys needed)
+    tacit owner/repo --modular              # Extract + print .claude/rules/ files
+    tacit owner/repo --output dir/          # Extract + write files to directory
+    tacit owner/repo --skip-extract         # Reuse existing DB, just generate
+    tacit owner/repo --skip-extract --summary  # Quick stats + top rules
 """
 
 import os
@@ -24,7 +26,6 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import database as db
 from config import settings
-from pipeline import run_extraction, generate_claude_md, generate_modular_rules
 
 
 BANNER = """\033[1;36m
@@ -104,14 +105,150 @@ def _novelty_score(rule: dict) -> float:
     return score
 
 
+def _print_summary(rules: list[dict], repo_name: str) -> None:
+    """Print concise summary: stats + anti-pattern/do-not rules only."""
+    total = len(rules)
+    novel = sum(1 for r in rules if r.get("source_type") not in ("docs", "conversation"))
+    anti = sum(1 for r in rules if r.get("source_type") == "anti_pattern")
+    prov = sum(1 for r in rules if r.get("provenance_url"))
+    by_source: dict[str, int] = {}
+    for r in rules:
+        st = r.get("source_type", "unknown")
+        by_source[st] = by_source.get(st, 0) + 1
+
+    docs_count = by_source.get("docs", 0) + by_source.get("config", 0)
+    discovered = anti + by_source.get("pr", 0) + by_source.get("ci_fix", 0)
+
+    print(f"\033[1;36m  {repo_name}\033[0m")
+    print(f"\033[1m  {total} rules extracted | {novel} novel ({round(novel*100/total)}%) | {prov} with provenance\033[0m")
+    print(f"\033[90m  {discovered} discovered from PRs & CI | {docs_count} from docs & config\033[0m")
+    print()
+
+    # Helper to format a rule for display
+    def _fmt_rule(r: dict) -> tuple[str, str]:
+        text = r["rule_text"]
+        if ". " in text:
+            text = text[:text.index(". ") + 1]
+        if len(text) > 120:
+            text = text[:117] + "..."
+        prov_url = r.get("provenance_url", "")
+        pr_ref = ""
+        if prov_url and "/pull/" in prov_url:
+            pr_num = prov_url.split("/pull/")[-1].split("#")[0]
+            pr_ref = f" \033[90m({_link(prov_url, f'PR #{pr_num}')})\033[0m"
+        return text, pr_ref
+
+    # Show anti-pattern rules — sorted by novelty, max 2 per PR
+    anti_rules = [r for r in rules if r.get("source_type") == "anti_pattern"]
+    if anti_rules:
+        ranked = sorted(anti_rules, key=_novelty_score, reverse=True)
+        shown: list[dict] = []
+        pr_counts: dict[str, int] = {}
+        for r in ranked:
+            p = r.get("provenance_url", "")
+            pr_id = p.split("/pull/")[-1] if "/pull/" in p else None
+            if pr_id:
+                pr_counts[pr_id] = pr_counts.get(pr_id, 0) + 1
+                if pr_counts[pr_id] > 2:
+                    continue
+            shown.append(r)
+            if len(shown) >= 5:
+                break
+        print(f"\033[1;31m  Anti-Patterns ({len(anti_rules)} rules, showing top {len(shown)}):\033[0m")
+        for r in shown:
+            text, pr_ref = _fmt_rule(r)
+            print(f"  \033[31m  ✗\033[0m {text}{pr_ref}")
+        print()
+
+    # Show novel PR-derived rules — sorted by novelty, dedup by PR
+    pr_rules = [r for r in rules if r.get("source_type") == "pr"]
+    if pr_rules:
+        ranked = sorted(pr_rules, key=_novelty_score, reverse=True)
+        shown_pr: list[dict] = []
+        seen_prs: set[str] = set()
+        for r in ranked:
+            p = r.get("provenance_url", "")
+            pr_id = p.split("/pull/")[-1] if "/pull/" in p else None
+            if pr_id and pr_id in seen_prs:
+                continue
+            if pr_id:
+                seen_prs.add(pr_id)
+            shown_pr.append(r)
+            if len(shown_pr) >= 5:
+                break
+        print(f"\033[1;33m  PR-Derived Rules ({len(pr_rules)} rules, showing top {len(shown_pr)}):\033[0m")
+        for r in shown_pr:
+            text, pr_ref = _fmt_rule(r)
+            print(f"  \033[33m  →\033[0m {text}{pr_ref}")
+        print()
+
+    # Show CI-fix rules — sorted by novelty
+    ci_rules = [r for r in rules if r.get("source_type") == "ci_fix"]
+    if ci_rules:
+        ranked = sorted(ci_rules, key=_novelty_score, reverse=True)
+        print(f"\033[1;32m  CI-Fix Rules ({len(ci_rules)} rules, showing top 5):\033[0m")
+        for r in ranked[:5]:
+            text, pr_ref = _fmt_rule(r)
+            print(f"  \033[32m  ✓\033[0m {text}{pr_ref}")
+        print()
+
+
+async def _run_demo(repo_name: str) -> int:
+    """Demo mode: seed data, simulate extraction, show summary. No API keys needed."""
+    from demo_data import seed_demo_rules, run_simulated_extraction
+
+    print(BANNER, file=sys.stderr)
+    print(f"\033[1;35m  [Demo Mode]\033[0m \033[90mUsing pre-loaded data for {repo_name}\033[0m", file=sys.stderr)
+    print(file=sys.stderr)
+
+    # Init DB and create/find repo
+    await db.init_db()
+    repos = await db.list_repos()
+    repo_record = None
+    for r in repos:
+        if r["full_name"] == repo_name:
+            repo_record = r
+            break
+
+    if repo_record:
+        repo_id = repo_record["id"]
+        existing = await db.list_rules(repo_id=repo_id)
+        if existing:
+            # Already has data — skip seeding, just show results
+            _progress(f"Found existing data ({len(existing)} rules)")
+            rules = existing
+        else:
+            # Repo exists but no rules — seed demo data
+            count = await seed_demo_rules(repo_id)
+            rules = await db.list_rules(repo_id=repo_id)
+            await run_simulated_extraction(count)
+    else:
+        # Create repo and seed
+        owner, name = repo_name.split("/", 1)
+        record = await db.create_repo(owner, name)
+        repo_id = record["id"]
+        count = await seed_demo_rules(repo_id)
+        rules = await db.list_rules(repo_id=repo_id)
+        await run_simulated_extraction(count)
+
+    print(file=sys.stderr)
+    _print_summary(rules, repo_name)
+    return 0
+
+
 async def main() -> int:
     parser = argparse.ArgumentParser(
-        prog="python -m tacit",
+        prog="tacit",
         description="Extract team knowledge from a GitHub repo and generate CLAUDE.md",
     )
     parser.add_argument(
         "repo",
         help="GitHub repository in owner/repo format (e.g. anthropics/claude-code)",
+    )
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="Demo mode: use pre-loaded data, no API keys needed",
     )
     parser.add_argument(
         "--modular",
@@ -154,15 +291,24 @@ async def main() -> int:
         _error("Expected: owner/repo (e.g. anthropics/claude-code)")
         return 1
 
-    # Check required env vars
+    # Demo mode — no API keys needed
+    if args.demo:
+        return await _run_demo(args.repo)
+
+    # Check required env vars (only for real extraction)
     github_token = settings.GITHUB_TOKEN or os.environ.get("GITHUB_TOKEN", "")
     if not github_token:
         _error("GITHUB_TOKEN not set. Export it or add to .env file.")
+        _error("Hint: use --demo for a quick demo without API keys")
         return 1
 
     if not settings.ANTHROPIC_API_KEY and not os.environ.get("ANTHROPIC_API_KEY", ""):
         _error("ANTHROPIC_API_KEY not set. Export it or add to .env file.")
+        _error("Hint: use --demo for a quick demo without API keys")
         return 1
+
+    # Lazy import — pipeline requires claude-agent-sdk
+    from pipeline import run_extraction, generate_claude_md, generate_modular_rules
 
     print(BANNER, file=sys.stderr)
     _progress(f"Target: {args.repo}")
@@ -214,91 +360,8 @@ async def main() -> int:
     assert repo_id is not None
 
     if args.summary:
-        # Concise output: stats + anti-pattern/do-not rules only
         rules = await db.list_rules(repo_id=repo_id)
-        total = len(rules)
-        novel = sum(1 for r in rules if r.get("source_type") not in ("docs", "conversation"))
-        anti = sum(1 for r in rules if r.get("source_type") == "anti_pattern")
-        prov = sum(1 for r in rules if r.get("provenance_url"))
-        by_source = {}
-        for r in rules:
-            st = r.get("source_type", "unknown")
-            by_source[st] = by_source.get(st, 0) + 1
-
-        docs_count = by_source.get("docs", 0) + by_source.get("config", 0)
-        discovered = anti + by_source.get("pr", 0) + by_source.get("ci_fix", 0)
-
-        print(f"\033[1;36m  {args.repo}\033[0m")
-        print(f"\033[1m  {total} rules extracted | {novel} novel ({round(novel*100/total)}%) | {prov} with provenance\033[0m")
-        print(f"\033[90m  {discovered} discovered from PRs & CI | {docs_count} from docs & config\033[0m")
-        print()
-
-        # Helper to format a rule for display
-        def _fmt_rule(r: dict) -> tuple[str, str]:
-            text = r["rule_text"]
-            if ". " in text:
-                text = text[:text.index(". ") + 1]
-            if len(text) > 120:
-                text = text[:117] + "..."
-            prov_url = r.get("provenance_url", "")
-            pr_ref = ""
-            if prov_url and "/pull/" in prov_url:
-                pr_num = prov_url.split("/pull/")[-1].split("#")[0]
-                pr_ref = f" \033[90m({_link(prov_url, f'PR #{pr_num}')})\033[0m"
-            return text, pr_ref
-
-        # Show anti-pattern rules — sorted by novelty, max 2 per PR
-        anti_rules = [r for r in rules if r.get("source_type") == "anti_pattern"]
-        if anti_rules:
-            ranked = sorted(anti_rules, key=_novelty_score, reverse=True)
-            shown, pr_counts = [], {}
-            for r in ranked:
-                prov = r.get("provenance_url", "")
-                pr_id = prov.split("/pull/")[-1] if "/pull/" in prov else None
-                if pr_id:
-                    pr_counts[pr_id] = pr_counts.get(pr_id, 0) + 1
-                    if pr_counts[pr_id] > 2:
-                        continue
-                shown.append(r)
-                if len(shown) >= 5:
-                    break
-            print(f"\033[1;31m  Anti-Patterns ({len(anti_rules)} rules, showing top {len(shown)}):\033[0m")
-            for r in shown:
-                text, pr_ref = _fmt_rule(r)
-                print(f"  \033[31m  ✗\033[0m {text}{pr_ref}")
-            print()
-
-        # Show novel PR-derived rules — sorted by novelty, dedup by PR
-        pr_rules = [r for r in rules if r.get("source_type") == "pr"]
-        if pr_rules:
-            ranked = sorted(pr_rules, key=_novelty_score, reverse=True)
-            shown, seen_prs = [], set()
-            for r in ranked:
-                prov = r.get("provenance_url", "")
-                pr_id = prov.split("/pull/")[-1] if "/pull/" in prov else None
-                if pr_id and pr_id in seen_prs:
-                    continue
-                if pr_id:
-                    seen_prs.add(pr_id)
-                shown.append(r)
-                if len(shown) >= 5:
-                    break
-            print(f"\033[1;33m  PR-Derived Rules ({len(pr_rules)} rules, showing top {len(shown)}):\033[0m")
-            for r in shown:
-                text, pr_ref = _fmt_rule(r)
-                print(f"  \033[33m  →\033[0m {text}{pr_ref}")
-            print()
-
-        # Show CI-fix rules — sorted by novelty
-        ci_rules = [r for r in rules if r.get("source_type") == "ci_fix"]
-        if ci_rules:
-            ranked = sorted(ci_rules, key=_novelty_score, reverse=True)
-            print(f"\033[1;32m  CI-Fix Rules ({len(ci_rules)} rules, showing top 5):\033[0m")
-            for r in ranked[:5]:
-                text, pr_ref = _fmt_rule(r)
-                print(f"  \033[32m  ✓\033[0m {text}{pr_ref}")
-            print()
-
+        _print_summary(rules, args.repo)
         return 0
 
     if args.modular:
