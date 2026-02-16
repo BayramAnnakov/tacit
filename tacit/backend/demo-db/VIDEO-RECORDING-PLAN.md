@@ -4,17 +4,18 @@
 
 ### Pre-flight Checklist
 1. [ ] Terminal: `cd tacit/backend && source venv/bin/activate`
-2. [ ] Verify CLI works: `python __main__.py openclaw/openclaw --skip-extract 2>/dev/null | head -5`
-3. [ ] Browser Tab 1: https://github.com/openclaw/openclaw/pull/15715 (package-lock PR)
-4. [ ] Browser Tab 2: https://github.com/openclaw/openclaw/pull/12669 (compute-and-discard PR)
-5. [ ] Slides open (slide1-title.html in browser or presentation tool)
-6. [ ] Screen recording software ready (QuickTime Player > File > New Screen Recording, or OBS)
-7. [ ] Mic check — record 5 seconds and play back
+2. [ ] Verify `--summary` works: `python __main__.py openclaw/openclaw --skip-extract --summary 2>/dev/null | head -5`
+3. [ ] Verify `--modular` works: `python __main__.py openclaw/openclaw --skip-extract --modular 2>/dev/null | head -5`
+4. [ ] Browser Tab 1: https://github.com/openclaw/openclaw/pull/15715 (package-lock PR)
+5. [ ] Browser Tab 2: https://github.com/openclaw/openclaw/pull/12669 (compute-and-discard PR)
+6. [ ] Slides open (slide2-problem.html — Step 1 is now a cold open, no title slide)
+7. [ ] Screen recording software ready (QuickTime Player > File > New Screen Recording, or OBS)
+8. [ ] Mic check — record 5 seconds and play back
 
 ### Screen Layout
-- **Left half**: Terminal (font size 16+ for readability)
-- **Right half**: Browser (for PR links)
-- Slides: fullscreen when showing, then switch to split layout for demo
+- **Start with**: Terminal fullscreen (font size 16+ for readability) — cold open is CLI
+- **Then**: Slides fullscreen for problem/solution
+- **Then**: Split — terminal left, browser right for demo + provenance
 
 ### Terminal Prep
 - Increase font size: `Cmd +` several times until text is readable at 720p
@@ -25,44 +26,51 @@
 
 ## Recording Steps
 
-### STEP 1: Show Slide 1 — Title (0:00-0:05)
+### STEP 1: COLD OPEN — Live CLI (0:00-0:15)
 
-**Action:** Fullscreen slide1-title.html
+**Action:** Terminal visible, large font. Skip slides — open with the tool running LIVE.
 
-**Say:**
-> "I love Claude Code. It's incredible — if you've invested enough in your CLAUDE.md."
+Type and run:
+```bash
+python __main__.py openclaw/openclaw --skip-extract --summary
+```
 
-**Transition:** Click to slide 2
+**Say while output appears:**
+> "Watch this. One command, one repo — Tacit just extracted 120 rules that this team enforces but never documented."
+
+**Why this works:** Judges see a working tool in the first 5 seconds, not slides. This is the "wow" opener.
+
+**Transition:** Pause 2 seconds on the output, then cut to slide 2.
 
 ---
 
-### STEP 2: Show Slide 2 — The Adoption Cliff (0:05-0:25)
+### STEP 2: Show Slide 2 — The Adoption Cliff (0:15-0:35)
 
 **Action:** Fullscreen slide2-problem.html
 
 **Say:**
-> "But I've talked to teams who tried it — they ran /init, got a basic CLAUDE.md, and the results were just okay. They didn't invest the time to document their unwritten conventions — the gotchas, the 'never do this' rules."
+> "Claude Code is incredible — if you've invested in your CLAUDE.md. But most teams run /init, get a basic file, and the results are just okay. They didn't document the unwritten rules — the gotchas from PR reviews."
 
-> "They got frustrated, stopped using Claude Code. Some fired the developer, threw out the code, never tried again. A huge lost opportunity."
-
-> "But that knowledge IS expressed — in PR reviews. Every time a reviewer says 'no, don't do that,' that's a tacit rule spoken out loud."
+> "But that knowledge IS expressed — every time a reviewer says 'no, don't do that,' that's a tacit rule spoken out loud."
 
 **Transition:** Click to slide 3
 
 ---
 
-### STEP 3: Show Slide 3 — How Tacit Works (0:25-0:40)
+### STEP 3: Show Slide 3 — How Tacit Works (0:35-0:50)
 
 **Action:** Fullscreen slide3-solution.html
 
 **Say:**
-> "That's why I built Tacit. Point it at any GitHub repo, and 16 agents mine PR reviews, CI failures, and CHANGES_REQUESTED discussions. It outputs native .claude/rules/ files. Zero manual effort."
+> "Tacit mines those signals. 16 Claude Agent SDK agents analyze PRs, CI failures, and rejected reviews in parallel. It outputs native .claude/rules/ files — zero manual effort."
+
+> "Our own repo uses the same .claude/rules/ format that Tacit generates — we practice what we preach."
 
 **Transition:** Switch to terminal (Cmd+Tab or click)
 
 ---
 
-### STEP 4: Live CLI Demo (0:40-1:20)
+### STEP 4: Deeper CLI Demo — Modular Output (0:50-1:20)
 
 **Action:** Terminal visible. Type and run:
 
@@ -73,14 +81,9 @@ python __main__.py openclaw/openclaw --skip-extract --modular
 > Use `--modular` for the demo — it shows the .claude/rules/ structure which is more visual
 
 **Say while output scrolls:**
-> "Here's Tacit running against OpenClaw — a real open-source project. It extracted 126 rules. 62% are novel discoveries not in any documentation."
+> "Now the modular output — these are the actual .claude/rules/ files Claude Code loads. Look at this do-not file: 'NEVER compute a result without applying it back' — caught in PR 12669. Every rule links back to the exact PR."
 
-**Action:** Scroll up to the `do-not.md` section. Point out a rule:
-
-**Say:**
-> "Look at this do-not file: 'NEVER introduce non-trivial logic without test coverage — caught in PRs 15094 and 12669.' And here — 'NEVER use relative paths for file I/O — caught in PR 15094 by two independent reviewers.' Every rule links back to the exact PR."
-
-**Action:** Scroll to show a few more rules, pause on provenance links
+**Action:** Scroll up to the `do-not.md` section. PAUSE on a rule with a provenance link for 3+ seconds — let judges READ it.
 
 ---
 
@@ -89,31 +92,32 @@ python __main__.py openclaw/openclaw --skip-extract --modular
 **Action:** Switch to browser. Open PR #15715 tab.
 
 **Say:**
-> "Let me show you where one of these rules came from. PR 15715: a contributor accidentally ran npm install in a pnpm repo, generating a 14,000-line package-lock.json."
+> "Let me show you where one rule came from. PR 15715: a contributor accidentally ran npm install in a pnpm repo, generating a 14,000-line package-lock.json."
 
-**Action:** Scroll down to the review comments section (look for "remove package-lock.json" comment)
+**Action:** Scroll down to the review comments. **PAUSE for 3 full seconds** so judges can read the reviewer comment. This is the single most impressive moment — don't rush it.
 
 **Say:**
-> "Two reviewers flagged it independently. Tacit read that conversation and extracted 'never commit package-lock in a pnpm repo' — with the exact reason why. It preserves the story behind the rule."
+> "Two reviewers flagged it. Tacit read that conversation and extracted 'never commit package-lock in a pnpm repo' — with the exact reason why. It preserves the story behind the rule."
 
-**Transition:** Switch to slide 6 or stay in browser
+**Transition:** Switch to slide 6
 
 ---
 
-### STEP 6: Show Slide 6 — The Numbers (1:50-2:10)
+### STEP 6: Show Slide 6 — The Numbers (1:50-2:15)
 
 **Action:** Fullscreen slide6-results.html
 
 **Say:**
-> "We tested Tacit against 8 major repos — Next.js, Deno, React, Claude Code. 783 rules total. 54% novel. 44 anti-patterns from rejected reviews. 98% with provenance."
+> "We tested against 8 major repos — Next.js, Deno, React, Claude Code. 783 rules total. 54% novel. 44 anti-patterns from rejected reviews. 98% with provenance."
 
-> "The ground truth test: for OpenClaw, Tacit independently rediscovered 87% of documented guidelines — without ever reading the CLAUDE.md file."
+**PAUSE. Then deliver the mic-drop line slowly:**
+> "The ground truth test: Tacit independently rediscovered 87% of OpenClaw's documented guidelines — without ever reading the CLAUDE.md file."
 
 **Transition:** Click to slide 7
 
 ---
 
-### STEP 7: Show Slide 7 — Close (2:10-2:30)
+### STEP 7: Show Slide 7 — Close (2:15-2:30)
 
 **Action:** Fullscreen slide7-closing.html
 

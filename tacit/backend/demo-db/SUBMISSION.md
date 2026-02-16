@@ -14,17 +14,11 @@ Agentic Coding (Claude Agent SDK + MCP)
 
 ## Project Description
 
-Tacit is a continuous team knowledge extraction system that discovers the unwritten rules your engineering team enforces but never documented. Point it at any GitHub repo — it deploys 16 Claude Agent SDK agents that mine PR reviews, CI failures, code configs, and CHANGES_REQUESTED discussions to extract tacit conventions and output CLAUDE.md and .claude/rules/ files.
+Tacit discovers the unwritten rules your engineering team enforces but never documented. Point it at any GitHub repo — 16 Claude Agent SDK agents mine PR reviews, CI failures, and CHANGES_REQUESTED discussions to extract tacit conventions, then output CLAUDE.md and path-scoped `.claude/rules/` files that Claude Code loads automatically.
 
-Key capabilities:
-- **Anti-pattern mining**: Analyzes rejected PR reviews to extract "NEVER do X" rules with full provenance — the exact PR where the team learned the lesson
-- **Multi-source extraction**: 4-phase async pipeline with 5 parallel analyzers (structural, docs, CI failures, code configs, anti-patterns) + deep PR thread analysis
-- **Native Claude Code output**: Generates CLAUDE.md and path-scoped .claude/rules/ files with YAML frontmatter — zero-friction adoption for any Claude Code user
-- **Continuous learning**: GitHub webhooks trigger incremental extraction on each merged PR
+What makes it different: anti-pattern mining from rejected PR reviews extracts "NEVER do X" rules with full provenance — linking each rule to the exact PR comment where the team learned the lesson. A 4-phase async pipeline runs 6 parallel analyzers (Sonnet for scanning, Opus for deep analysis), synthesizes across sources with confidence boosting, and filters generic platitudes through 3 layers. This repo itself uses the `.claude/rules/` format Tacit generates — same convention, applied to our own development.
 
-Tested against 8 major OSS repos (Next.js, Deno, React, Prisma, LangChain, Claude Code, Claude Agent SDK Python, OpenClaw). Results: 783 rules extracted, 54% novel (not in any existing docs), 44 anti-patterns mined, 98% with provenance links. 8-eval quality suite scores 83% overall. For OpenClaw, Tacit independently rediscovered 87% of documented guidelines just from PR reviews and CI data — without ever reading the CLAUDE.md file.
-
-Built with: Claude Agent SDK (16 agents), MCP (20 tools via in-process servers), Claude Opus 4.6 + Sonnet, FastAPI backend, SwiftUI macOS frontend.
+Tested against 8 major OSS repos. Results: 783 rules extracted, 54% novel, 98% with provenance links. Eval suite scores 83%. Tacit independently rediscovered 87% of OpenClaw's documented guidelines from PR data alone — without reading the CLAUDE.md.
 
 ## Public GitHub Repository
 https://github.com/BayramAnnakov/tacit

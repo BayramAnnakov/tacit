@@ -200,9 +200,13 @@ Key results:
 - **Tools**: 20 MCP tools for GitHub API, knowledge CRUD, DB introspection, PR validation
 - **APIs**: GitHub REST API v3
 
+## Dogfooding
+
+This repo itself uses `.claude/rules/` — the same format Tacit generates. We maintain 4 rule files (code style, workflow, testing, do-not) that guide Claude Code when working on Tacit. It's the same convention Tacit extracts from other teams' PR reviews and outputs as path-scoped rule files.
+
 ## Built With
 
-Built during the Anthropic Hackathon (Feb 2026) using Claude Code (Opus 4.6).
+Built during the Anthropic "Built with Opus 4.6" Hackathon (Feb 2026) using Claude Code (Opus 4.6).
 
 ## License
 
