@@ -132,6 +132,22 @@ swift build && swift run TacitApp
 Requires macOS 14+ with Xcode 15+. SwiftUI three-column app connects to the backend via REST + WebSocket.
 </details>
 
+### API Server (for webhooks, PR validation, live UI)
+
+The CLI handles extraction and generation standalone. For continuous learning, PR validation, and the macOS frontend, start the API server:
+
+```bash
+cd tacit/backend && source venv/bin/activate
+python main.py  # → http://127.0.0.1:8000
+```
+
+This enables:
+- **Webhook endpoint** (`POST /api/webhook/github`) — incremental learning from merged PRs
+- **PR validation** (`POST /api/validate-pr/post-review`) — posts review comments on open PRs
+- **Live extraction stream** (`WS /ws`) — real-time agent progress via WebSocket
+- **Session mining** (`POST /api/mine-sessions`) — extract knowledge from Claude Code transcripts
+- **Knowledge browser API** — REST endpoints for the macOS frontend
+
 ## Features
 
 ### Multi-Source Extraction Pipeline
