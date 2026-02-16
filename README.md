@@ -208,13 +208,13 @@ Key results:
 
 This repo itself uses `.claude/rules/` — the same format Tacit generates. We maintain 4 rule files (code style, workflow, testing, do-not) that guide Claude Code when working on Tacit. It's the same convention Tacit extracts from other teams' PR reviews and outputs as path-scoped rule files.
 
-## Vision
+## Vision: Federated Learning for Team Knowledge
 
-Today Tacit extracts knowledge from a repo's PR history. The next step is **continuous, team-wide learning**:
+Today Tacit extracts knowledge from a repo's PR history. The next step is **federated learning for coding conventions** — where knowledge is extracted locally on each developer's machine and only the distilled rules are shared centrally.
 
-1. **Every developer's Claude Code sessions become a knowledge source.** As developers work, Tacit's hook captures corrections, preferences, and patterns from their local conversations — "use X instead of Y", "always check Z before deploying."
+1. **Local extraction, no raw data shared.** Each developer's Claude Code sessions stay on their machine. Tacit's hook extracts only the transferable lesson — "use X instead of Y", "always check Z before deploying" — never the conversation itself.
 
-2. **Rules flow from individuals to the team.** Each developer's discoveries are proposed as candidate rules. The CLAUDE.md owner reviews incoming proposals, accepts the ones that reflect real team conventions, and rejects noise.
+2. **Central aggregation with human review.** Proposed rules flow to the CLAUDE.md owner, who accepts conventions that reflect real team patterns and rejects noise. Like federated learning: local training, central model update, human-in-the-loop.
 
 3. **The knowledge base compounds over time.** New hires get an onboarding guide generated from hundreds of real decisions. The PR validator catches violations before reviewers have to. Rules that no longer apply get downvoted and pruned.
 
