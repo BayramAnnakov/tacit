@@ -162,10 +162,29 @@ Track PR review rounds, CI failure rate, time-to-merge, and comment density to m
 Watch AI agents work in real-time via WebSocket with pipeline progress bar, event cards, and rolling stats counters.
 
 ### Incremental Learning
-Webhook-driven single-PR extraction from merged PRs. Auto-approves high-confidence rules (>= 0.85), creates proposals for lower-confidence ones.
+Webhook-driven single-PR extraction from merged PRs. When a PR merges, Tacit analyzes its discussion thread, extracts new rules, and auto-approves high-confidence ones (>= 0.85). Lower-confidence rules become proposals for human review.
+
+```bash
+# Setup: add a GitHub webhook pointing to your Tacit instance
+# Payload URL: https://your-host/api/webhook/github
+# Events: Pull requests
+# Tacit handles the rest — new rules appear automatically after each merge.
+```
 
 ### PR Validation
-Validate PRs against the knowledge base. Posts review comments on GitHub with provenance links showing why each rule exists.
+Validate open PRs against the knowledge base before merge. Tacit's `pr-validator` agent checks the diff against learned rules and posts review comments on GitHub with provenance links showing *why* each rule exists and *where* the team learned it.
+
+```bash
+# Validate a PR against learned rules:
+curl -X POST http://localhost:8000/api/validate-pr \
+  -H "Content-Type: application/json" \
+  -d '{"repo": "owner/repo", "pr_number": 123}'
+
+# Post review comments directly on the PR:
+curl -X POST http://localhost:8000/api/validate-pr/post-review \
+  -H "Content-Type: application/json" \
+  -d '{"repo": "owner/repo", "pr_number": 123}'
+```
 
 ### Session Mining
 Captures knowledge from Claude Code session transcripts via hooks. Extracts corrections, preferences, and conventions from actual AI-assisted coding sessions.
