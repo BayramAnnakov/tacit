@@ -54,6 +54,55 @@ def _link(url: str, text: str) -> str:
     return f"\033]8;;{url}\033\\{text}\033]8;;\033\\"
 
 
+def _print_cost(cost_data: dict) -> None:
+    """Print pipeline cost and timing breakdown to stderr."""
+    if not cost_data:
+        return
+    if not (cost_data.get("total_cost_usd", 0) > 0 or cost_data.get("elapsed_seconds", 0) > 0):
+        return
+
+    parts = []
+
+    # Timing
+    elapsed = cost_data.get("elapsed_seconds", 0)
+    if elapsed > 0:
+        if elapsed >= 60:
+            mins = int(elapsed // 60)
+            secs = int(elapsed % 60)
+            parts.append(f"{mins}m{secs}s")
+        else:
+            parts.append(f"{int(elapsed)}s")
+
+    # Agent count
+    num_agents = cost_data.get("num_agents_run", 0)
+    if num_agents > 0:
+        parts.append(f"{num_agents} agent runs")
+
+    # Token usage
+    input_t = cost_data.get("total_input_tokens", 0)
+    output_t = cost_data.get("total_output_tokens", 0)
+    cache_t = cost_data.get("total_cache_read_tokens", 0)
+    if input_t or output_t:
+        token_str = f"{input_t + output_t:,} tokens"
+        if cache_t:
+            token_str += f" ({cache_t:,} cached)"
+        parts.append(token_str)
+
+    # Cost
+    total_cost = cost_data.get("total_cost_usd", 0)
+    if total_cost > 0:
+        parts.append(f"${total_cost:.2f}")
+        by_model = cost_data.get("by_model", {})
+        if len(by_model) > 1:
+            model_parts = []
+            for model, model_cost in sorted(by_model.items(), key=lambda x: x[1], reverse=True):
+                model_parts.append(f"{model}: ${model_cost:.2f}")
+            parts.append(f"({', '.join(model_parts)})")
+
+    if parts:
+        print(f"\033[90m  Pipeline: {' | '.join(parts)}\033[0m", file=sys.stderr)
+
+
 # Generic patterns found in any codebase — deprioritize for demo display
 _GENERIC_LOWTEXT = [
     "without test coverage", "without updating its corresponding tests",
@@ -329,6 +378,7 @@ async def main() -> int:
         repo_id = None  # Will be created during extraction
 
     # Run extraction unless skipped
+    cost_data: dict = {}
     if not args.skip_extract:
         _progress("Starting extraction pipeline...")
         rules_found = 0
@@ -341,6 +391,7 @@ async def main() -> int:
                 _error(event.message)
             elif event.event_type == "complete":
                 rules_found = event.data.get("total_rules", 0) if event.data else rules_found
+                cost_data = event.data.get("cost", {}) if event.data else {}
                 _success(f"Extraction complete: {rules_found} rules found")
 
         # Re-fetch repo_id after extraction (may have been created)
@@ -359,6 +410,7 @@ async def main() -> int:
     if args.summary:
         rules = await db.list_rules(repo_id=repo_id)
         _print_summary(rules, args.repo)
+        _print_cost(cost_data)
         return 0
 
     if args.modular:
@@ -420,6 +472,8 @@ async def main() -> int:
         with_provenance = sum(1 for r in final_rules if r.get("provenance_url"))
         novel = sum(1 for r in final_rules if r.get("source_type") not in ("docs", "conversation"))
         print(f"\n\033[1m  Summary: {total} rules | {novel} novel ({round(novel*100/total)}%) | {anti_patterns} anti-patterns | {with_provenance} with provenance\033[0m", file=sys.stderr)
+
+    _print_cost(cost_data)
 
     return 0
 

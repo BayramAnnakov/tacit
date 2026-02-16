@@ -6,6 +6,8 @@ os.environ.pop("CLAUDECODE", None)  # Allow nested Claude SDK calls from within 
 import asyncio
 import json
 import logging
+import sys
+import time
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 
@@ -78,18 +80,76 @@ async def _remove_generic_rules(rules: list[dict]) -> int:
     return removed
 
 
+class CostTracker:
+    """Accumulate token usage, cost, and timing across multiple agent runs."""
+
+    def __init__(self) -> None:
+        self.start_time: float = time.time()
+        self.total_cost_usd: float = 0.0
+        self.total_input_tokens: int = 0
+        self.total_output_tokens: int = 0
+        self.total_cache_read_tokens: int = 0
+        self.total_cache_creation_tokens: int = 0
+        self.agent_costs: dict[str, float] = {}  # agent_name → cost
+        self.agent_durations: dict[str, float] = {}  # agent_name → duration_ms
+        self.model_costs: dict[str, float] = {}   # model_name → cost
+        self.num_agents_run: int = 0
+
+    def record(self, agent_name: str, model: str, message: "ResultMessage") -> None:
+        cost = message.total_cost_usd or 0.0
+        self.total_cost_usd += cost
+        self.num_agents_run += 1
+        self.agent_costs[agent_name] = self.agent_costs.get(agent_name, 0.0) + cost
+        self.agent_durations[agent_name] = (
+            self.agent_durations.get(agent_name, 0.0) + message.duration_ms
+        )
+
+        # Accumulate per-model costs
+        self.model_costs[model] = self.model_costs.get(model, 0.0) + cost
+
+        # Accumulate token counts from usage dict
+        if message.usage:
+            self.total_input_tokens += message.usage.get("input_tokens", 0)
+            self.total_output_tokens += message.usage.get("output_tokens", 0)
+            self.total_cache_read_tokens += message.usage.get("cache_read_input_tokens", 0)
+            self.total_cache_creation_tokens += message.usage.get("cache_creation_input_tokens", 0)
+
+    def summary(self) -> dict:
+        elapsed = time.time() - self.start_time
+        return {
+            "total_cost_usd": round(self.total_cost_usd, 4),
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
+            "total_cache_read_tokens": self.total_cache_read_tokens,
+            "total_cache_creation_tokens": self.total_cache_creation_tokens,
+            "elapsed_seconds": round(elapsed, 1),
+            "num_agents_run": self.num_agents_run,
+            "by_model": {k: round(v, 4) for k, v in self.model_costs.items()},
+            "by_agent": {k: round(v, 4) for k, v in sorted(
+                self.agent_costs.items(), key=lambda x: x[1], reverse=True
+            )},
+        }
+
+
+# Global cost tracker — reset per extraction run
+_cost_tracker: CostTracker | None = None
+
+
 async def _run_agent(
     agent_name: str,
     prompt: str,
     repo_id: int | None = None,
+    context: str | None = None,
 ) -> str:
     """Run a single agent and collect its text output."""
+    global _cost_tracker
     agents = get_agent_definitions()
     tools_server = create_tacit_tools_server()
 
+    agent_def = agents[agent_name]
     options = ClaudeAgentOptions(
-        system_prompt=agents[agent_name].prompt,
-        model=agents[agent_name].model,
+        system_prompt=agent_def.prompt,
+        model=agent_def.model,
         mcp_servers={SERVER_NAME: tools_server},
         allowed_tools=TOOL_NAMES,
         permission_mode="bypassPermissions",
@@ -109,6 +169,24 @@ async def _run_agent(
             elif isinstance(message, ResultMessage):
                 if message.is_error:
                     logger.error(f"Agent {agent_name} error: {message.result}")
+                if _cost_tracker is not None:
+                    _cost_tracker.record(agent_name, agent_def.model or "unknown", message)
+                    # Print per-agent cost line to stderr (visible in CLI)
+                    cost = message.total_cost_usd or 0.0
+                    dur_s = (message.duration_ms or 0) / 1000
+                    tokens = 0
+                    if message.usage:
+                        tokens = message.usage.get("input_tokens", 0) + message.usage.get("output_tokens", 0)
+                    model_short = (agent_def.model or "unknown").replace("claude-", "")
+                    parts = [f"{dur_s:.0f}s", f"${cost:.2f}"]
+                    if tokens:
+                        parts.append(f"{tokens:,}tok")
+                    ctx_str = f": {context} " if context else " "
+                    print(
+                        f"\033[32m    ✓\033[0m {agent_name}{ctx_str}"
+                        f"\033[90m({', '.join(parts)}, {model_short})\033[0m",
+                        file=sys.stderr,
+                    )
     finally:
         await client.disconnect()
 
@@ -145,6 +223,10 @@ async def run_extraction(
     if run_id is None:
         run = await db.create_extraction_run(repo_id)
         run_id = int(run["id"])
+
+    # Initialize cost tracking for this extraction run
+    global _cost_tracker
+    _cost_tracker = CostTracker()
 
     try:
         # === Phase 1: Launch parallel analyzers ===
@@ -216,8 +298,8 @@ async def run_extraction(
         )
         await db.update_extraction_run(run_id, stage="analyzing")
 
-        # Analyze PR threads in parallel (up to 3 concurrent)
-        sem = asyncio.Semaphore(3)
+        # Analyze PR threads in parallel (up to 5 concurrent)
+        sem = asyncio.Semaphore(5)
         pr_tasks = []
         for pr_num in pr_numbers[:max_prs]:
             task = asyncio.create_task(
@@ -334,6 +416,9 @@ async def run_extraction(
             st = rule.get("source_type", "unknown")
             source_counts[st] = source_counts.get(st, 0) + 1
 
+        # Collect cost data
+        cost_data = _cost_tracker.summary() if _cost_tracker else {}
+
         yield ExtractionEvent(
             event_type="complete",
             stage="complete",
@@ -342,6 +427,7 @@ async def run_extraction(
                 "total_rules": len(final_rules),
                 "prs_analyzed": len(pr_numbers[:10]),
                 "rules_by_source": source_counts,
+                "cost": cost_data,
             },
         )
 
@@ -369,7 +455,7 @@ async def _analyze_single_pr(
             f"Use github_fetch_comments with repo='{repo}', pr_number={pr_num}, github_token='{github_token}'. "
             f"Extract knowledge rules and store them using store_knowledge with repo_id={repo_id}."
         )
-        return await _run_agent("thread-analyzer", analyzer_prompt, repo_id)
+        return await _run_agent("thread-analyzer", analyzer_prompt, repo_id, context=f"PR #{pr_num}")
 
 
 async def _run_structural_analysis(repo: str, github_token: str, repo_id: int) -> str:

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #0D1117; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+.illustration {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background-image: url('illustration-closing.png');
+  background-size: cover;
+  background-position: right center;
+  filter: brightness(0.4);
+}
+.overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: linear-gradient(to right, rgba(13, 17, 23, 0.95) 0%, rgba(13, 17, 23, 0.7) 45%, rgba(13, 17, 23, 0.2) 100%);
+}
+.top-bar { position: absolute; top: 0; left: 0; height: 4pt; background: #00D4AA; width: 100%; z-index: 2; }
+.content {
+  position: relative; z-index: 2;
+  flex: 1; display: flex; flex-direction: column;
+  justify-content: center;
+  padding: 40pt 55pt;
+  max-width: 50%;
+}
+h2 { color: #00D4AA; font-size: 30pt; margin: 0 0 14pt 0; line-height: 1.2; }
+.tagline { color: #C9D1D9; font-size: 15pt; margin: 0 0 24pt 0; line-height: 1.5; }
+.command-box {
+  background: rgba(0, 212, 170, 0.08);
+  border: 1px solid rgba(0, 212, 170, 0.25);
+  border-radius: 8pt;
+  padding: 12pt 16pt;
+  margin: 0 0 20pt 0;
+}
+.cmd { color: #00D4AA; font-size: 11pt; margin: 0; font-family: 'Courier New', monospace; }
+.links {
+  display: flex; gap: 14pt;
+}
+.link-badge {
+  padding: 6pt 14pt;
+  background: rgba(201, 209, 217, 0.06);
+  border: 1px solid rgba(201, 209, 217, 0.12);
+  border-radius: 14pt;
+}
+.link-text { color: #8B949E; font-size: 10pt; margin: 0; }
+.credit {
+  position: absolute; bottom: 16pt; left: 55pt; z-index: 2;
+  color: #8B949E; font-size: 10pt; margin: 0;
+}
+</style>
+</head>
+<body>
+<div class="illustration"></div>
+<div class="overlay"></div>
+<div class="top-bar"></div>
+<div class="content">
+  <h2>Your Team Already Said It</h2>
+  <p class="tagline">/init handles the inferrable.<br>Tacit handles the tacit.</p>
+  <div class="command-box">
+    <p class="cmd">uvx --from "git+https://github.com/BayramAnnakov/tacit.git" tacit owner/repo --demo</p>
+  </div>
+  <div class="links">
+    <div class="link-badge"><p class="link-text">github.com/BayramAnnakov/tacit</p></div>
+    <div class="link-badge"><p class="link-text">Built with Opus 4.6</p></div>
+  </div>
+</div>
+<p class="credit">Bayram Annakov</p>
+</body>
+</html>
