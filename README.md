@@ -208,6 +208,18 @@ Key results:
 
 This repo itself uses `.claude/rules/` — the same format Tacit generates. We maintain 4 rule files (code style, workflow, testing, do-not) that guide Claude Code when working on Tacit. It's the same convention Tacit extracts from other teams' PR reviews and outputs as path-scoped rule files.
 
+## Vision
+
+Today Tacit extracts knowledge from a repo's PR history. The next step is **continuous, team-wide learning**:
+
+1. **Every developer's Claude Code sessions become a knowledge source.** As developers work, Tacit's hook captures corrections, preferences, and patterns from their local conversations — "use X instead of Y", "always check Z before deploying."
+
+2. **Rules flow from individuals to the team.** Each developer's discoveries are proposed as candidate rules. The CLAUDE.md owner reviews incoming proposals, accepts the ones that reflect real team conventions, and rejects noise.
+
+3. **The knowledge base compounds over time.** New hires get an onboarding guide generated from hundreds of real decisions. The PR validator catches violations before reviewers have to. Rules that no longer apply get downvoted and pruned.
+
+The end state: a team's CLAUDE.md writes and maintains itself — sourced from what the team actually does, not what someone remembered to document.
+
 ## Built With
 
 Built during the Anthropic "Built with Opus 4.6" Hackathon (Feb 2026) using Claude Code (Opus 4.6).
