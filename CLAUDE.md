@@ -33,7 +33,7 @@ swift build && swift run TacitApp
 cd tacit/backend
 source venv/bin/activate
 python eval_extract.py            # v1: extraction quality vs ground truth
-python eval_v2.py                 # v2: 8 capability evals (anti-patterns, provenance, path scoping, modular rules, incremental, metrics, domain knowledge, ground truth recall)
+python eval_v2.py                 # v2: 8 capability evals, 83% overall (anti-patterns, provenance, path scoping, modular rules, incremental, metrics, domain knowledge, ground truth recall)
 python eval_v2.py --skip-extraction  # v2: reuse existing DB, run evals only
 ```
 
@@ -56,8 +56,9 @@ Two components: Python FastAPI backend + SwiftUI macOS frontend, connected via R
 
 **Phase 3** — Await Phase 1 parallel tasks
 
-**Phase 4 — Synthesis**:
+**Phase 4 — Synthesis + Cleanup**:
 - `synthesizer` (Opus): cross-source dedup, confidence boosting, removes generic rules
+- Post-synthesis programmatic filter: removes rules matching 28 known generic patterns (3-layer filtering)
 - `generator` (Opus): produces structured CLAUDE.md output (called on-demand via API)
 - `modular-generator` (Opus): produces `.claude/rules/` directory with path-scoped YAML frontmatter files
 

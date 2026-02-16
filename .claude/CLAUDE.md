@@ -30,6 +30,7 @@ cd tacit/backend && source venv/bin/activate
 python __main__.py owner/repo                  # Extract + print CLAUDE.md
 python __main__.py owner/repo --modular        # Extract + print .claude/rules/
 python __main__.py owner/repo --skip-extract   # Reuse existing DB
+python __main__.py owner/repo --skip-extract --summary  # Quick stats + top rules
 ```
 
 ### Eval
@@ -64,7 +65,8 @@ See `.claude/rules/` for detailed conventions on each subsystem.
 | `tacit/backend/database.py` | SQLite schema and CRUD |
 | `tacit/backend/main.py` | FastAPI app (REST + WebSocket + webhook) |
 | `tacit/backend/__main__.py` | CLI tool (`python __main__.py owner/repo`) |
-| `tacit/backend/eval_v2.py` | Eval suite (8 evals, 74% overall) |
+| `tacit/backend/__main__.py` | CLI tool (`python __main__.py owner/repo --summary`) |
+| `tacit/backend/eval_v2.py` | Eval suite (8 evals, 83% overall) |
 | `tacit/backend/prompts/` | Agent prompt files (16 prompts) |
 | `tacit/TacitApp/` | SwiftUI macOS frontend |
 

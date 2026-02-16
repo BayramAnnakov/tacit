@@ -8,7 +8,7 @@ paths:
   - Phase 1: 5 parallel analyzers (structural, docs, CI, code, anti-pattern)
   - Phase 2: PR scanning + thread analysis (3 concurrent via `asyncio.Semaphore`)
   - Phase 3: Await Phase 1 parallel tasks
-  - Phase 4: Synthesis (dedup, boost, remove generic rules)
+  - Phase 4: Synthesis (dedup, boost, remove generic rules) + post-synthesis programmatic filter (28 known generic patterns)
 - All extraction functions are async generators yielding `ExtractionEvent`
 - `incremental_extract()` for webhook-driven single-PR extraction
   - Auto-approves rules at confidence >= 0.85

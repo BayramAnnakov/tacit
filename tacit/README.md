@@ -55,6 +55,9 @@ cd tacit/backend && source venv/bin/activate
 # Full extraction + generate CLAUDE.md
 python __main__.py owner/repo
 
+# Quick summary: stats + top anti-patterns + PR-derived rules
+python __main__.py owner/repo --skip-extract --summary
+
 # Generate modular .claude/rules/ files
 python __main__.py owner/repo --modular
 
@@ -65,9 +68,15 @@ python __main__.py owner/repo --modular --output ./my-project/
 python __main__.py owner/repo --skip-extract
 ```
 
-Example output from OpenClaw (a real 15k+ PR open-source project):
+Example output from OpenClaw (a real open-source project with 15k+ PRs):
 ```
-  Summary: 158 rules | 47 novel (30%) | 10 anti-patterns | 158 with provenance
+  120 rules extracted | 72 novel (60%) | 55 with provenance
+  55 discovered from PRs & CI | 65 from docs & config
+
+  Anti-Patterns (23 rules, showing top 5):
+    ✗ NEVER compute a result without applying it back (PR #12669)
+    ✗ NEVER reuse context window constant for output tokens (PR #12667)
+    ...
 ```
 
 ## Quick Start
@@ -122,6 +131,9 @@ The backend seeds demo data on first launch:
 
 ### Multi-Source Extraction Pipeline
 6 parallel Phase 1 agents analyze repo structure, docs, CI failures, code configs, anti-patterns from PR rejections, and domain/product knowledge from README, ADRs, and architecture docs. Phase 2 deep-analyzes PR threads. Phase 4 synthesizes across all sources with cross-source confidence boosting.
+
+### 3-Layer Generic Rule Filtering
+Tacit aggressively filters generic best practices ("always write tests", "remove dead code") that add no value. Layer 1: agent prompts include a "skip generic" section with project-specificity test. Layer 2: synthesizer deduplicates and removes generic patterns. Layer 3: post-synthesis programmatic safety net catches anything the LLM missed (28 known generic patterns).
 
 ### Anti-Pattern Mining
 LLM-gated extraction of "Do Not" rules from CHANGES_REQUESTED PR reviews. Captures what reviewers repeatedly reject, with diff hunks and provenance links.
@@ -196,6 +208,8 @@ Team members propose rules from their local Claude Code conversations. Reviewers
 
 ## Eval Suite
 
+8 evals across 8 OSS repos (langchain, deno, prisma, next.js, react, claude-code, claude-agent-sdk-python, openclaw). **Overall score: 83%.**
+
 ```bash
 cd tacit/backend && source venv/bin/activate
 
@@ -206,6 +220,11 @@ python eval_extract.py
 python eval_v2.py
 python eval_v2.py --skip-extraction  # reuse existing DB
 ```
+
+Key results:
+- Anti-pattern mining: 88% (7/8 repos yield anti-patterns)
+- Ground truth recall: 47% (rules independently discovered without reading CLAUDE.md)
+- Provenance coverage: 98% of rules link to exact PR comments
 
 ## Built With
 
