@@ -139,6 +139,7 @@ async def github_fetch_comments(args: dict) -> dict:
                     "author": c["user"]["login"],
                     "body": c["body"],
                     "created_at": c["created_at"],
+                    "html_url": c.get("html_url", ""),
                 })
 
         # Fetch review comments (inline code review)
@@ -156,6 +157,7 @@ async def github_fetch_comments(args: dict) -> dict:
                     "path": c.get("path", ""),
                     "diff_hunk": c.get("diff_hunk", ""),
                     "created_at": c["created_at"],
+                    "html_url": c.get("html_url", ""),
                 })
 
         # Fetch reviews themselves
@@ -173,6 +175,7 @@ async def github_fetch_comments(args: dict) -> dict:
                         "body": r["body"],
                         "state": r["state"],
                         "created_at": r["submitted_at"],
+                        "html_url": r.get("html_url", ""),
                     })
 
     # Sort by creation time
@@ -756,6 +759,7 @@ async def github_fetch_rejected_patterns(args: dict) -> dict:
                     "path": c.get("path", ""),
                     "diff_hunk": (c.get("diff_hunk") or "")[:400],
                     "has_suggestion_block": "```suggestion" in body,
+                    "html_url": c.get("html_url", ""),
                 })
 
             # Collect all review-level bodies (top-level review summaries)
@@ -767,6 +771,7 @@ async def github_fetch_rejected_patterns(args: dict) -> dict:
                         "author": r["user"]["login"],
                         "state": r.get("state", ""),
                         "body": body[:500],
+                        "html_url": r.get("html_url", ""),
                     })
 
             patterns.append({

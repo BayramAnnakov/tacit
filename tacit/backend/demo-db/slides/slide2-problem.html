@@ -12,62 +12,74 @@ body {
 }
 .top-bar { height: 4pt; background: #00D4AA; width: 100%; }
 .content { flex: 1; padding: 28pt 40pt; display: flex; flex-direction: column; }
-h2 { color: #00D4AA; font-size: 26pt; margin: 0 0 14pt 0; }
-.two-col { display: flex; flex: 1; gap: 30pt; }
-.col { flex: 1; }
-.pain-box {
-  background: rgba(248, 81, 73, 0.08);
-  border-left: 4pt solid #F85149;
-  padding: 10pt 14pt;
-  margin-bottom: 8pt;
-  border-radius: 0 6pt 6pt 0;
+h2 { color: #00D4AA; font-size: 26pt; margin: 0 0 6pt 0; }
+.hook { color: #C9D1D9; font-size: 15pt; margin: 0 0 18pt 0; line-height: 1.4; }
+.hook em { color: #00D4AA; font-style: normal; }
+.steps { display: flex; flex-direction: column; gap: 8pt; margin-bottom: 14pt; }
+.step {
+  display: flex; align-items: flex-start; gap: 12pt;
 }
-.pain-title { color: #F85149; font-size: 13pt; font-weight: bold; margin: 0 0 4pt 0; }
-.pain-desc { color: #8B949E; font-size: 11pt; margin: 0; }
-.stat-box {
-  background: rgba(0, 212, 170, 0.08);
+.step-icon {
+  width: 28pt; height: 28pt; min-width: 28pt;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.step-icon-green { background: rgba(0, 212, 170, 0.15); }
+.step-icon-red { background: rgba(248, 81, 73, 0.15); }
+.step-icon-text-green { color: #00D4AA; font-size: 14pt; font-weight: bold; margin: 0; }
+.step-icon-text-red { color: #F85149; font-size: 14pt; font-weight: bold; margin: 0; }
+.step-content {
+  flex: 1; background: #161B22;
+  border: 1px solid #30363D;
+  border-radius: 8pt; padding: 10pt 14pt;
+}
+.step-title { color: #C9D1D9; font-size: 12pt; font-weight: bold; margin: 0 0 3pt 0; }
+.step-desc { color: #8B949E; font-size: 10pt; margin: 0; }
+.step-content-red {
+  flex: 1; background: rgba(248, 81, 73, 0.06);
+  border: 1px solid rgba(248, 81, 73, 0.2);
+  border-radius: 8pt; padding: 10pt 14pt;
+}
+.insight-box {
+  background: rgba(0, 212, 170, 0.06);
   border: 1px solid rgba(0, 212, 170, 0.2);
-  border-radius: 8pt;
-  padding: 12pt;
-  margin-bottom: 8pt;
+  border-radius: 8pt; padding: 12pt 16pt;
+  margin-top: auto;
 }
-.stat-num { color: #00D4AA; font-size: 28pt; font-weight: bold; margin: 0; }
-.stat-label { color: #8B949E; font-size: 11pt; margin: 4pt 0 0 0; }
+.insight-text { color: #C9D1D9; font-size: 12pt; margin: 0; }
+.insight-text em { color: #00D4AA; font-style: normal; font-weight: bold; }
 </style>
 </head>
 <body>
 <div class="top-bar"></div>
 <div class="content">
-  <h2>The Problem</h2>
-  <div class="two-col">
-    <div class="col">
-      <div class="pain-box">
-        <p class="pain-title">Tribal Knowledge</p>
-        <p class="pain-desc">Rules that exist only in people's heads: "don't commit package-lock in a pnpm repo"</p>
-      </div>
-      <div class="pain-box">
-        <p class="pain-title">Learned by Failing</p>
-        <p class="pain-desc">New developers discover conventions by making mistakes and getting PRs rejected</p>
-      </div>
-      <div class="pain-box">
-        <p class="pain-title">Lost in PR Reviews</p>
-        <p class="pain-desc">Critical knowledge buried in thousands of review comments nobody reads again</p>
+  <h2>The Claude Code Adoption Cliff</h2>
+  <p class="hook">I love Claude Code. It's incredible — <em>if</em> you've invested enough in your CLAUDE.md.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-icon step-icon-green"><p class="step-icon-text-green">1</p></div>
+      <div class="step-content">
+        <p class="step-title">Team runs /init — gets a basic CLAUDE.md</p>
+        <p class="step-desc">Build systems, frameworks, configs detected. The inferrable stuff.</p>
       </div>
     </div>
-    <div class="col">
-      <div class="stat-box">
-        <p class="stat-num">70%</p>
-        <p class="stat-label">of team conventions are undocumented</p>
-      </div>
-      <div class="stat-box">
-        <p class="stat-num">30%</p>
-        <p class="stat-label">of PR review cycles are for already-known rules</p>
-      </div>
-      <div class="stat-box">
-        <p class="stat-num">0</p>
-        <p class="stat-label">tools that extract rules FROM code reviews</p>
+    <div class="step">
+      <div class="step-icon step-icon-red"><p class="step-icon-text-red">2</p></div>
+      <div class="step-content-red">
+        <p class="step-title">Results are mediocre — tacit rules missing</p>
+        <p class="step-desc">Claude doesn't know the gotchas, the "never do this" rules. Nobody wrote them down.</p>
       </div>
     </div>
+    <div class="step">
+      <div class="step-icon step-icon-red"><p class="step-icon-text-red">3</p></div>
+      <div class="step-content-red">
+        <p class="step-title">Team gives up, stops using Claude Code</p>
+        <p class="step-desc">Frustrated by repeated mistakes. Fire the developer, throw out the code, never try again.</p>
+      </div>
+    </div>
+  </div>
+  <div class="insight-box">
+    <p class="insight-text">But that knowledge <em>is</em> expressed — in PR reviews. Every "don't do that" comment is a tacit rule spoken out loud.</p>
   </div>
 </div>
 </body>

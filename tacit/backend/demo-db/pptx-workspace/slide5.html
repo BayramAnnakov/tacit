@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #0D1117; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+  background: #0D1117;
+}
+.bar { height: 4pt; background: #00D4AA; width: 100%; }
+.content {
+  flex: 1; padding: 28pt 50pt;
+  display: flex; flex-direction: column;
+  justify-content: center;
+}
+.stats { display: flex; gap: 14pt; margin: 14pt 0; }
+.stat {
+  flex: 1; background: #161B22;
+  border: 1px solid #30363D;
+  border-radius: 8pt; padding: 12pt;
+  text-align: center;
+}
+.repos { display: flex; flex-wrap: wrap; gap: 6pt; margin: 10pt 0; }
+.repo-tag {
+  padding: 4pt 10pt;
+  background: rgba(0, 212, 170, 0.06);
+  border: 1px solid rgba(0, 212, 170, 0.12);
+  border-radius: 12pt;
+}
+.highlight-box {
+  background: rgba(0, 212, 170, 0.06);
+  border: 1px solid rgba(0, 212, 170, 0.15);
+  border-radius: 8pt;
+  padding: 10pt 18pt;
+  text-align: center;
+  margin-top: 10pt;
+}
+</style>
+</head>
+<body>
+<div class="bar"></div>
+<div class="content">
+  <h2 style="color: #00D4AA; font-size: 26pt; margin: 0;">Results: 8 OSS Repos + Private Teams</h2>
+  <div class="stats">
+    <div class="stat">
+      <p style="color: #00D4AA; font-size: 32pt; font-weight: bold; margin: 0;">783</p>
+      <p style="color: #8B949E; font-size: 10pt; margin: 3pt 0 0 0;">Rules extracted</p>
+    </div>
+    <div class="stat">
+      <p style="color: #00D4AA; font-size: 32pt; font-weight: bold; margin: 0;">54%</p>
+      <p style="color: #8B949E; font-size: 10pt; margin: 3pt 0 0 0;">Novel discoveries</p>
+    </div>
+    <div class="stat">
+      <p style="color: #00D4AA; font-size: 32pt; font-weight: bold; margin: 0;">44</p>
+      <p style="color: #8B949E; font-size: 10pt; margin: 3pt 0 0 0;">Anti-patterns</p>
+    </div>
+    <div class="stat">
+      <p style="color: #00D4AA; font-size: 32pt; font-weight: bold; margin: 0;">98%</p>
+      <p style="color: #8B949E; font-size: 10pt; margin: 3pt 0 0 0;">With provenance</p>
+    </div>
+  </div>
+  <div class="repos">
+    <div class="repo-tag"><p style="color: #C9D1D9; font-size: 9pt; margin: 0;">vercel/next.js</p></div>
+    <div class="repo-tag"><p style="color: #C9D1D9; font-size: 9pt; margin: 0;">denoland/deno</p></div>
+    <div class="repo-tag"><p style="color: #C9D1D9; font-size: 9pt; margin: 0;">anthropics/claude-code</p></div>
+    <div class="repo-tag"><p style="color: #C9D1D9; font-size: 9pt; margin: 0;">anthropics/sdk-python</p></div>
+    <div class="repo-tag"><p style="color: #C9D1D9; font-size: 9pt; margin: 0;">langchain-ai/langchain</p></div>
+    <div class="repo-tag"><p style="color: #C9D1D9; font-size: 9pt; margin: 0;">prisma/prisma</p></div>
+    <div class="repo-tag"><p style="color: #C9D1D9; font-size: 9pt; margin: 0;">facebook/react</p></div>
+    <div class="repo-tag"><p style="color: #C9D1D9; font-size: 9pt; margin: 0;">openclaw/openclaw</p></div>
+    <div class="repo-tag"><p style="color: #8B949E; font-size: 9pt; margin: 0; font-style: italic;">+ private repos</p></div>
+  </div>
+  <div class="highlight-box">
+    <p style="color: #C9D1D9; font-size: 13pt; margin: 0;">54% of rules are <b style="color: #00D4AA;">novel</b> — conventions teams enforce in reviews but never documented</p>
+  </div>
+</div>
+</body>
+</html>

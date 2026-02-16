@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #0D1117; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+  background: #0D1117;
+}
+.bar { height: 4pt; background: #00D4AA; width: 100%; }
+.content {
+  flex: 1; padding: 32pt 50pt;
+  display: flex; flex-direction: column;
+  justify-content: center;
+}
+.flow { display: flex; align-items: center; gap: 10pt; margin: 18pt 0; }
+.phase {
+  flex: 1; padding: 14pt 10pt;
+  background: rgba(0, 212, 170, 0.06);
+  border: 1px solid rgba(0, 212, 170, 0.15);
+  border-radius: 8pt;
+  text-align: center;
+}
+.arrow { color: #00D4AA; font-size: 20pt; }
+.outputs { display: flex; gap: 12pt; margin-top: 16pt; }
+.out {
+  flex: 1; padding: 10pt;
+  background: #161B22;
+  border: 1px solid #30363D;
+  border-radius: 8pt;
+  text-align: center;
+}
+</style>
+</head>
+<body>
+<div class="bar"></div>
+<div class="content">
+  <h2 style="color: #00D4AA; font-size: 28pt; margin: 0;">How Tacit Works</h2>
+  <p style="color: #8B949E; font-size: 14pt; margin: 4pt 0 0 0;">16 agents mine your repo history — output follows Claude Code's memory hierarchy</p>
+  <div class="flow">
+    <div class="phase">
+      <p style="color: #00D4AA; font-size: 10pt; margin: 0 0 4pt 0;">PHASE 1</p>
+      <p style="color: #C9D1D9; font-size: 13pt; font-weight: bold; margin: 0;">Analyze</p>
+    </div>
+    <div class="arrow"><p style="margin: 0;">&rarr;</p></div>
+    <div class="phase">
+      <p style="color: #00D4AA; font-size: 10pt; margin: 0 0 4pt 0;">PHASE 2</p>
+      <p style="color: #C9D1D9; font-size: 13pt; font-weight: bold; margin: 0;">Mine PRs</p>
+    </div>
+    <div class="arrow"><p style="margin: 0;">&rarr;</p></div>
+    <div class="phase">
+      <p style="color: #00D4AA; font-size: 10pt; margin: 0 0 4pt 0;">PHASE 3</p>
+      <p style="color: #C9D1D9; font-size: 13pt; font-weight: bold; margin: 0;">Synthesize</p>
+    </div>
+    <div class="arrow"><p style="margin: 0;">&rarr;</p></div>
+    <div class="phase">
+      <p style="color: #00D4AA; font-size: 10pt; margin: 0 0 4pt 0;">PHASE 4</p>
+      <p style="color: #C9D1D9; font-size: 13pt; font-weight: bold; margin: 0;">Generate</p>
+    </div>
+  </div>
+  <div class="outputs">
+    <div class="out">
+      <p style="color: #00D4AA; font-size: 13pt; font-weight: bold; margin: 0;">.claude/rules/</p>
+      <p style="color: #8B949E; font-size: 9pt; margin: 3pt 0 0 0;">Anti-patterns, code style, testing</p>
+    </div>
+    <div class="out">
+      <p style="color: #C9D1D9; font-size: 13pt; font-weight: bold; margin: 0;">CLAUDE.md</p>
+      <p style="color: #8B949E; font-size: 9pt; margin: 3pt 0 0 0;">Architecture, workflows, commands</p>
+    </div>
+    <div class="out">
+      <p style="color: #C9D1D9; font-size: 13pt; font-weight: bold; margin: 0;">Provenance</p>
+      <p style="color: #8B949E; font-size: 9pt; margin: 3pt 0 0 0;">Every rule links to source PR</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

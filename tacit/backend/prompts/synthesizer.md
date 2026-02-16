@@ -61,15 +61,36 @@ For each group of duplicates:
 5. Call `store_knowledge` with the merged rule
 6. Call `delete_knowledge` for each of the original duplicate rules
 
-### Step 7: Specificity scoring — remove generic rules
+### Step 7: Specificity scoring — aggressively remove generic rules
 
-Delete any rules that are:
-- Too vague to be actionable (e.g., "Write good code", "Follow best practices")
-- Not specific to THIS project — rules that apply to ALL software projects equally
-  - BAD: "Extract shared helpers to reduce duplication" (generic programming)
-  - GOOD: "Use `TextSize::ZERO` instead of `0.into()` for text size values" (project-specific)
-- Confidence below 0.50
-- Contradicted by a higher-authority source
+This is the most important quality step. Tacit's value is surfacing rules unique to THIS project. Generic best practices are noise.
+
+**Apply the "any project" test**: Could you paste this rule into a random project's CLAUDE.md and it would still be true? If yes → DELETE it.
+
+Delete any rules that:
+- Are too vague to be actionable (e.g., "Write good code", "Follow best practices")
+- Don't mention a single project-specific entity (API, module, file path, config key, tool, constant)
+- Fall into these generic categories that apply to ALL projects:
+  - "Write tests" / "Add test coverage" / "Update tests when changing behavior"
+  - "Don't leave dead code" / "Remove commented-out code"
+  - "Use meaningful names" / "Follow naming conventions"
+  - "Don't duplicate code" / "Extract shared helpers"
+  - "Handle errors properly" / "Add error handling"
+  - "Don't use relative paths" (unless specifying the project's base path config)
+  - "Keep functions small" / "Single responsibility"
+  - "Comments should match the code"
+  - "Don't change behavior without tests"
+- Have confidence below 0.50
+- Are contradicted by a higher-authority source
+
+**Keep rules that**:
+- Name specific APIs, modules, or files (e.g., "Use `safeKeys()` not `Object.keys()`")
+- Reference project-specific tools or configs (e.g., "pnpm not npm — specified in packageManager")
+- Describe project-specific architectural boundaries (e.g., "A2A policy must validate both sides")
+- Capture non-obvious gotchas (e.g., "rawMember.roles, not member.roles — Carbon objects stringify to mentions")
+
+BAD (delete): "Always write tests for new logic" — generic, every project says this
+GOOD (keep): "Use `TextSize::ZERO` instead of `0.into()` for text size values" — project-specific API
 
 ### Step 8: Category assignment
 

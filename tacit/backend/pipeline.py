@@ -25,6 +25,58 @@ import database as db
 
 logger = logging.getLogger(__name__)
 
+# Generic patterns that apply to ALL projects — not project-specific knowledge.
+# These are the safety net: even if LLM agents extract them, we remove them post-synthesis.
+# Each pattern is lowercased for matching against rule_text.lower().
+_GENERIC_RULE_PATTERNS = [
+    "without test coverage",
+    "without updating its corresponding tests",
+    "without updating tests",
+    "always write tests",
+    "add test coverage",
+    "commented-out code or dead",
+    "dead/debugging code",
+    "leave dead code",
+    "remove dead code",
+    "relative paths for file i/o",
+    "don't use relative paths",
+    "code comments that contradict",
+    "comments should match",
+    "duplicate regex patterns, constants",
+    "duplicate code across multiple files",
+    "extract shared helpers",
+    "keep functions small",
+    "single responsibility",
+    "use meaningful variable names",
+    "meaningful names",
+    "handle errors properly",
+    "handle errors gracefully",
+    "add error handling",
+    "follow best practices",
+    "write clean code",
+    "don't change behavior without tests",
+    "change the behavior of an existing function",
+]
+
+
+async def _remove_generic_rules(rules: list[dict]) -> int:
+    """Remove rules matching known generic patterns. Returns count of removed rules."""
+    removed = 0
+    for rule in rules:
+        text = rule.get("rule_text", "").lower()
+        # Only filter anti_pattern and pr source types — docs/config rules describe the repo
+        if rule.get("source_type") not in ("anti_pattern", "pr"):
+            continue
+        for pattern in _GENERIC_RULE_PATTERNS:
+            if pattern in text:
+                rule_id = rule.get("id")
+                if rule_id:
+                    await db.delete_rule(rule_id)
+                    logger.info(f"Removed generic rule #{rule_id}: {text[:80]}...")
+                    removed += 1
+                break
+    return removed
+
 
 async def _run_agent(
     agent_name: str,
@@ -260,6 +312,12 @@ async def run_extraction(
             f"merge duplicates, and remove generic/low-quality rules."
         )
         await _run_agent("synthesizer", synth_prompt, repo_id)
+
+        # Post-synthesis cleanup: remove generic rules the LLM missed
+        post_synth_rules = await db.list_rules(repo_id=repo_id)
+        removed = await _remove_generic_rules(post_synth_rules)
+        if removed:
+            logger.info(f"Post-synthesis cleanup: removed {removed} generic rules")
 
         final_rules = await db.list_rules(repo_id=repo_id)
         await db.update_extraction_run(

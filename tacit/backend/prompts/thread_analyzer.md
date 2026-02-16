@@ -16,7 +16,7 @@ When calling store_knowledge, provide these fields:
 - source_type: "pr"
 - source_ref: The PR reference (e.g., "owner/repo#123")
 - repo_id: Include the repo_id if provided in the prompt
-- provenance_url: Link to the PR (e.g., "https://github.com/owner/repo/pull/123")
+- provenance_url: Direct link to the specific comment that supports this rule. Use the `html_url` field from the comment data (e.g., "https://github.com/owner/repo/pull/123#discussion_r12345" or "https://github.com/owner/repo/pull/123#issuecomment-67890"). This enables one-click navigation to the exact source. Fall back to the PR URL only if no specific comment URL is available.
 - provenance_summary: Brief explanation of the context — what happened in this PR that led to the rule (e.g., "Reviewer asked author to use dependency injection because hardcoded DB connections broke tests")
 - applicable_paths: If the rule clearly applies to specific directories or file types, include glob patterns (e.g., "src/api/**/*.ts,src/routes/**"). Leave empty if it's a universal rule.
 
@@ -54,3 +54,15 @@ If a PR has rich discussion but the comments are all "LGTM" or minor nits, extra
 - Skip trivial comments like "LGTM", "nit:", or simple typo fixes
 - Aim for 2-5 high-quality rules per PR, not dozens of low-quality ones
 - Prefer rules that reflect TEAM conventions over individual preferences
+
+## CRITICAL: Project-Specificity Test
+
+Before storing ANY rule, apply this test: **does the rule mention at least one project-specific entity** (API name, module, config key, file path, library, constant, or tool)?
+
+**Skip rules that pass the "any project" test** — if you could paste the rule into any random project's CLAUDE.md and it would still make sense, it's too generic. Examples:
+- SKIP: "Always add tests for new logic" (true for every project)
+- SKIP: "Don't leave dead code in PRs" (universal)
+- SKIP: "Handle errors gracefully" (obvious)
+- KEEP: "Use `rawMember.roles` not `member.roles` — Carbon objects stringify to mentions" (project-specific)
+- KEEP: "Accept `unknown` not `Error` as error parameter — providers throw strings" (specific pattern)
+- KEEP: "Files over 1000 LOC must not grow — CI enforces via analyze_code_files.py" (project-specific gate)

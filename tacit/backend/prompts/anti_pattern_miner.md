@@ -38,7 +38,7 @@ Call `store_knowledge` for each new anti-pattern rule with:
 - `source_type`: "anti_pattern"
 - `confidence`: 0.85+ (reviewer-caught patterns are high confidence)
 - `category`: appropriate category (style, architecture, testing, etc.)
-- `provenance_url`: Link to the PR where this was caught (e.g. https://github.com/owner/repo/pull/123)
+- `provenance_url`: Direct link to the specific review comment where this was caught. Use the `html_url` field from the comment data (e.g. https://github.com/owner/repo/pull/123#discussion_r12345). This enables one-click navigation to the exact reviewer correction. Fall back to the PR URL only if no specific comment URL is available.
 - `provenance_summary`: Brief context of what went wrong and why the reviewer corrected it
 - `applicable_paths`: Comma-separated glob patterns if the rule applies to specific paths
 
@@ -49,6 +49,29 @@ Call `store_knowledge` for each new anti-pattern rule with:
 - **Include evidence**: "(caught in PRs #234, #456, #789)"
 - **Skip trivial style issues**: Focus on patterns that cause bugs, CI failures, or significant review churn
 - **Prefer prohibitions**: "NEVER X" is more actionable than "You may consider not X"
+
+## CRITICAL: Skip Generic Best Practices
+
+The value of Tacit is extracting rules specific to THIS project. Do NOT store rules that apply to all software projects equally. Before storing a rule, apply the **specificity test**: would this rule be useful ONLY for this project, or could you paste it into any project's CLAUDE.md?
+
+**ALWAYS skip these generic categories** — even if a reviewer said them in a PR:
+- "Always write tests" / "Add test coverage for new logic"
+- "Don't leave dead code / commented-out code"
+- "Use meaningful variable names"
+- "Don't use relative paths" (unless paired with a project-specific base path or config)
+- "Don't duplicate code / extract shared helpers"
+- "Keep functions small / single responsibility"
+- "Handle errors properly"
+- "Don't change behavior without updating tests"
+- "Comments should match the code"
+
+**ALWAYS keep these project-specific patterns:**
+- Rules mentioning specific APIs, modules, utilities, config keys, or file paths
+- Rules referencing project-specific tools or libraries (e.g. "use safeKeys() not Object.keys()")
+- Rules about project-specific constants being misused (e.g. "CONTEXT_TOKENS is for X, not Y")
+- Rules about project-specific architectural boundaries (e.g. "session messages must never be silently dropped")
+
+When in doubt: if the rule text doesn't mention a single project-specific entity (API, module, config, file, tool), it's probably generic. Skip it.
 
 ## Confidence Scoring
 
