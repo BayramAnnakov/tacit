@@ -12,7 +12,7 @@ struct TacitApp: App {
             SidebarCommands()
             CommandGroup(replacing: .help) {
                 Button("Tacit Help") {
-                    NSWorkspace.shared.open(URL(string: "https://github.com/tacit-team/tacit")!)
+                    NSWorkspace.shared.open(URL(string: "https://github.com/BayramAnnakov/tacit")!)
                 }
             }
         }

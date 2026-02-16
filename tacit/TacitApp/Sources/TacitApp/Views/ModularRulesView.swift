@@ -39,6 +39,7 @@ struct ModularRulesView: View {
                 fileList
             }
         }
+        .navigationTitle("Modular Rules")
     }
 
     private var header: some View {

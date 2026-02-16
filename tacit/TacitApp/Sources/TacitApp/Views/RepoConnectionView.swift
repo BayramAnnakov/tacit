@@ -37,12 +37,15 @@ struct RepoConnectionView: View {
                 Button {
                     Task {
                         isConnecting = true
+                        let countBefore = appVM.repos.count
                         await appVM.addRepo(
                             url: repoURL,
                             token: githubToken.isEmpty ? nil : githubToken
                         )
                         isConnecting = false
-                        dismiss()
+                        if appVM.repos.count > countBefore {
+                            dismiss()
+                        }
                     }
                 } label: {
                     if isConnecting {

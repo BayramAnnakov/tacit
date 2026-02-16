@@ -23,7 +23,7 @@ struct ConfidenceBadge: View {
 
     var color: Color {
         if confidence >= 0.85 { return .green }
-        if confidence >= 0.60 { return .yellow }
+        if confidence >= 0.60 { return Color(hue: 0.08, saturation: 0.8, brightness: 0.85) }
         return .orange
     }
 
@@ -56,6 +56,7 @@ struct SourceBadge: View {
         case .docs: return .indigo
         case .cifix: return .red
         case .config: return .cyan
+        case .antiPattern: return .orange
         }
     }
 
@@ -67,6 +68,7 @@ struct SourceBadge: View {
         case .docs: return "Docs"
         case .cifix: return "CI Fix"
         case .config: return "Config"
+        case .antiPattern: return "Anti-Pattern"
         }
     }
 
@@ -78,6 +80,7 @@ struct SourceBadge: View {
         case .docs: return "doc.text.magnifyingglass"
         case .cifix: return "exclamationmark.triangle"
         case .config: return "gearshape.2"
+        case .antiPattern: return "hand.raised.slash"
         }
     }
 
@@ -104,7 +107,7 @@ struct ConfidenceMeter: View {
 
     var color: Color {
         if confidence >= 0.85 { return .green }
-        if confidence >= 0.60 { return .yellow }
+        if confidence >= 0.60 { return Color(hue: 0.08, saturation: 0.8, brightness: 0.85) }
         return .orange
     }
 

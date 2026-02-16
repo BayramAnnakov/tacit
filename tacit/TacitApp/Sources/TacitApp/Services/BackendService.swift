@@ -17,7 +17,7 @@ final class BackendService {
 
     private init() {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForRequest = 120
         self.session = URLSession(configuration: config)
 
         self.decoder = JSONDecoder()
@@ -214,18 +214,40 @@ final class BackendService {
 
     // MARK: - WebSocket
 
+    private var reconnectAttempts = 0
+    private let maxReconnectAttempts = 5
+
     func connectWebSocket() {
         guard let url = URL(string: wsURL) else { return }
+        webSocketTask?.cancel(with: .goingAway, reason: nil)
         webSocketTask = session.webSocketTask(with: url)
         webSocketTask?.resume()
-        isConnected = true
         receiveMessage()
+        // Send a ping to verify the connection is alive
+        webSocketTask?.sendPing { [weak self] error in
+            DispatchQueue.main.async {
+                if error == nil {
+                    self?.isConnected = true
+                    self?.reconnectAttempts = 0
+                }
+            }
+        }
     }
 
     func disconnectWebSocket() {
+        reconnectAttempts = maxReconnectAttempts // prevent auto-reconnect
         webSocketTask?.cancel(with: .goingAway, reason: nil)
         webSocketTask = nil
         isConnected = false
+    }
+
+    private func scheduleReconnect() {
+        guard reconnectAttempts < maxReconnectAttempts else { return }
+        reconnectAttempts += 1
+        let delay = Double(min(reconnectAttempts * 2, 10))
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            self?.connectWebSocket()
+        }
     }
 
     private func receiveMessage() {
@@ -248,6 +270,7 @@ final class BackendService {
             case .failure:
                 DispatchQueue.main.async {
                     self.isConnected = false
+                    self.scheduleReconnect()
                 }
             }
         }

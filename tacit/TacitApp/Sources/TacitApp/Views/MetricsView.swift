@@ -27,6 +27,12 @@ struct MetricsView: View {
             } else if isLoading {
                 ProgressView("Loading metrics...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let errorMessage {
+                ContentUnavailableView(
+                    "Failed to Load Metrics",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(errorMessage)
+                )
             } else if repos.isEmpty {
                 ContentUnavailableView(
                     "No Repositories",

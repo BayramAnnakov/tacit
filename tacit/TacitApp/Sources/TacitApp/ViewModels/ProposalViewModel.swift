@@ -6,6 +6,7 @@ final class ProposalViewModel {
     var selectedProposal: Proposal?
     var statusFilter: String? = "pending"
     var isLoading = false
+    var errorMessage: String?
 
     /// Called when a proposal is approved or rejected
     var onProposalReviewed: (() -> Void)?
@@ -17,8 +18,10 @@ final class ProposalViewModel {
         defer { isLoading = false }
         do {
             proposals = try await backend.listProposals(status: statusFilter)
+            errorMessage = nil
         } catch {
             proposals = []
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -33,8 +36,9 @@ final class ProposalViewModel {
         do {
             let created = try await backend.createProposal(proposal)
             proposals.insert(created, at: 0)
+            errorMessage = nil
         } catch {
-            // Error handled silently
+            errorMessage = "Failed to create proposal: \(error.localizedDescription)"
         }
     }
 
@@ -45,9 +49,10 @@ final class ProposalViewModel {
                 proposals[index] = updated
             }
             selectedProposal = updated
+            errorMessage = nil
             onProposalReviewed?()
         } catch {
-            // Error handled silently
+            errorMessage = "Failed to approve proposal: \(error.localizedDescription)"
         }
     }
 
@@ -58,9 +63,10 @@ final class ProposalViewModel {
                 proposals[index] = updated
             }
             selectedProposal = updated
+            errorMessage = nil
             onProposalReviewed?()
         } catch {
-            // Error handled silently
+            errorMessage = "Failed to reject proposal: \(error.localizedDescription)"
         }
     }
 }

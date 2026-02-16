@@ -45,6 +45,7 @@ struct KnowledgeRule: Codable, Identifiable, Hashable {
         case docs
         case cifix = "ci_fix"
         case config
+        case antiPattern = "anti_pattern"
     }
 }
 

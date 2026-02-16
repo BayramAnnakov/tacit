@@ -177,6 +177,7 @@ struct KnowledgeRuleDetailView: View {
         case .docs: return "Documentation"
         case .cifix: return "CI Fix Pattern"
         case .config: return "Config Analysis"
+        case .antiPattern: return "Anti-Pattern"
         }
     }
 
