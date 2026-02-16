@@ -9,18 +9,9 @@
 
 Tacit turns the invisible knowledge buried in code reviews and AI conversations into explicit, actionable team guidelines that Claude Code loads automatically.
 
-## Try It Now
-
-```bash
-# One-liner with uvx (Python's npx — no install needed):
-uvx --from "git+https://github.com/BayramAnnakov/tacit.git" tacit openclaw/openclaw --demo
-
-# Or with pip:
-pip install "git+https://github.com/BayramAnnakov/tacit.git"
-tacit openclaw/openclaw --demo
-```
-
-The `--demo` flag uses pre-loaded data from a real open-source project — no API keys required. You'll see the 16-agent extraction pipeline simulate in real-time, then get a summary of 40 rules with provenance links to actual PRs.
+<p align="center">
+  <img src="tacit-demo.gif" alt="Tacit CLI demo" width="800">
+</p>
 
 ## The Problem
 
@@ -87,13 +78,15 @@ Example output from OpenClaw (a real open-source project with 15k+ PRs):
 
 ## Quick Start
 
-### Option 1: One-liner (demo mode, no API keys)
+### Try it (demo mode, no API keys)
 
 ```bash
 uvx --from "git+https://github.com/BayramAnnakov/tacit.git" tacit openclaw/openclaw --demo
 ```
 
-### Option 2: Full extraction (real repo)
+The `--demo` flag uses pre-loaded data from a real 50-PR extraction — no API keys required.
+
+### Install and extract from your repo
 
 ```bash
 pip install "git+https://github.com/BayramAnnakov/tacit.git[full]"
@@ -106,7 +99,7 @@ export GITHUB_TOKEN=ghp_...
 tacit owner/repo --summary
 ```
 
-### Option 3: From source (for development)
+### From source (for development)
 
 ```bash
 git clone https://github.com/BayramAnnakov/tacit.git && cd tacit

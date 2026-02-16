@@ -1,5 +1,6 @@
 .env
 *.db
+!**/demo-db/demo.db
 venv/
 __pycache__/
 .DS_Store
@@ -13,3 +14,10 @@ tacit/backend/tacit.db
 *.db.bak
 .firecrawl/
 *.egg-info/
+Tacit.app/
+pptx-workspace/
+slides/
+*.db.demo-*
+*.db.pre-*
+*.db.openclaw-*
+~$*
