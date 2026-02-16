@@ -3,14 +3,15 @@
 ## Before You Start
 
 ### Pre-flight Checklist
-1. [ ] Terminal: `cd tacit/backend && source venv/bin/activate`
-2. [ ] Verify `--summary` works: `python __main__.py openclaw/openclaw --skip-extract --summary 2>/dev/null | head -5`
-3. [ ] Verify `--modular` works: `python __main__.py openclaw/openclaw --skip-extract --modular 2>/dev/null | head -5`
-4. [ ] Browser Tab 1: https://github.com/openclaw/openclaw/pull/15715 (package-lock PR)
-5. [ ] Browser Tab 2: https://github.com/openclaw/openclaw/pull/12669 (compute-and-discard PR)
-6. [ ] Slides open (slide2-problem.html — Step 1 is now a cold open, no title slide)
-7. [ ] Screen recording software ready (QuickTime Player > File > New Screen Recording, or OBS)
-8. [ ] Mic check — record 5 seconds and play back
+1. [ ] Install: `pip install -e .` (from repo root) so `tacit` command is available
+2. [ ] Verify demo: `tacit openclaw/openclaw --demo 2>&1 | head -5`
+3. [ ] Verify summary: `tacit openclaw/openclaw --skip-extract --summary 2>&1 | head -5`
+4. [ ] Verify modular: `tacit openclaw/openclaw --skip-extract --modular 2>&1 | head -5`
+5. [ ] Browser Tab 1: https://github.com/openclaw/openclaw/pull/15715 (package-lock PR)
+6. [ ] Browser Tab 2: https://github.com/openclaw/openclaw/pull/12669 (compute-and-discard PR)
+7. [ ] Slides open (slide2-problem.html — Step 1 is now a cold open, no title slide)
+8. [ ] Screen recording software ready (QuickTime Player > File > New Screen Recording, or OBS)
+9. [ ] Mic check — record 5 seconds and play back
 
 ### Screen Layout
 - **Start with**: Terminal fullscreen (font size 16+ for readability) — cold open is CLI
@@ -26,19 +27,24 @@
 
 ## Recording Steps
 
-### STEP 1: COLD OPEN — Live CLI (0:00-0:15)
+### STEP 1: COLD OPEN — Live CLI with Simulated Extraction (0:00-0:20)
 
 **Action:** Terminal visible, large font. Skip slides — open with the tool running LIVE.
 
 Type and run:
 ```bash
-python __main__.py openclaw/openclaw --skip-extract --summary
+tacit openclaw/openclaw --demo
 ```
 
-**Say while output appears:**
-> "Watch this. One command, one repo — Tacit just extracted 120 rules that this team enforces but never documented."
+**Say while the simulated extraction plays:**
+> "Watch this. One command — Tacit deploys 16 AI agents that mine PR reviews, CI failures, and rejected code changes."
 
-**Why this works:** Judges see a working tool in the first 5 seconds, not slides. This is the "wow" opener.
+The simulated extraction shows agents completing in real-time: structural analyzer, docs analyzer, CI failure miner, anti-pattern miner, then PR thread analysis with specific PR numbers. Judges SEE the multi-agent architecture in action.
+
+**Say when summary appears:**
+> "40 rules discovered — 88% novel, every one linked to the exact PR where the team learned it."
+
+**Why this works:** Judges see both the agentic pipeline AND the results in 20 seconds. This is the "wow" opener.
 
 **Transition:** Pause 2 seconds on the output, then cut to slide 2.
 
@@ -75,7 +81,7 @@ python __main__.py openclaw/openclaw --skip-extract --summary
 **Action:** Terminal visible. Type and run:
 
 ```bash
-python __main__.py openclaw/openclaw --skip-extract --modular
+tacit openclaw/openclaw --skip-extract --modular
 ```
 
 > Use `--modular` for the demo — it shows the .claude/rules/ structure which is more visual
@@ -122,7 +128,7 @@ python __main__.py openclaw/openclaw --skip-extract --modular
 **Action:** Fullscreen slide7-closing.html
 
 **Say:**
-> "/init handles the inferrable. Tacit handles the tacit. The output is native .claude/rules/ — feeds right back into Claude Code. You shouldn't have to write it — your team already said it in their PR reviews."
+> "/init handles the inferrable. Tacit handles the tacit. One command — `uvx tacit owner/repo` — and your team's unwritten rules become .claude/rules/ files. You shouldn't have to write it — your team already said it in their PR reviews."
 
 **Pause 3 seconds. End recording.**
 
