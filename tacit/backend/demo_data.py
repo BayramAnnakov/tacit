@@ -413,8 +413,31 @@ EXTRACTION_TIMELINE: list[tuple[float, str, str]] = [
     (1.0, "agent", "\033[32m    ✓\033[0m synthesizer: Merged 97 → 72 rules (dedup, confidence boosting)"),
     (0.5, "agent", "\033[32m    ✓\033[0m Generic filter: Removed 5 platitudes \033[90m(3-layer filtering)\033[0m"),
     (0.3, "done", "\033[1;32m  ✓ Extraction complete: {total} rules found\033[0m"),
-    (0.2, "cost", "\033[90m  Pipeline: 20m43s | 57 agent runs | 163,970 tokens (10,845,589 cached) | $13.10 (opus: $9.15, sonnet: $3.95)\033[0m"),
 ]
+
+
+# Real cost data from 50-PR openclaw extraction (Feb 2026)
+DEMO_COST_DATA: dict = {
+    "total_cost_usd": 13.10,
+    "total_input_tokens": 163_970,
+    "total_output_tokens": 0,  # included in input total
+    "total_cache_read_tokens": 10_845_589,
+    "total_cache_creation_tokens": 0,
+    "elapsed_seconds": 1243.0,  # 20m43s
+    "num_agents_run": 57,
+    "by_model": {"opus": 9.15, "sonnet": 3.95},
+    "by_agent": {
+        "domain-analyzer": 1.41,
+        "docs-analyzer": 1.09,
+        "synthesizer": 0.76,
+        "code-analyzer": 0.67,
+        "structural-analyzer": 0.52,
+        "pr-scanner": 0.27,
+        "anti-pattern-miner": 0.19,
+        "ci-failure-miner": 0.12,
+        "thread-analyzer": 8.07,
+    },
+}
 
 
 async def seed_demo_rules(repo_id: int) -> int:

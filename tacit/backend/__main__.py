@@ -244,7 +244,7 @@ def _print_summary(rules: list[dict], repo_name: str) -> None:
 
 async def _run_demo(repo_name: str) -> int:
     """Demo mode: seed data, simulate extraction, show summary. No API keys needed."""
-    from demo_data import seed_demo_rules, run_simulated_extraction
+    from demo_data import seed_demo_rules, run_simulated_extraction, DEMO_COST_DATA
 
     print(BANNER, file=sys.stderr)
     print(f"\033[1;35m  [Demo Mode]\033[0m \033[90mUsing pre-loaded data for {repo_name}\033[0m", file=sys.stderr)
@@ -279,6 +279,7 @@ async def _run_demo(repo_name: str) -> int:
 
     print(file=sys.stderr)
     _print_summary(rules, repo_name)
+    _print_cost(DEMO_COST_DATA)
     return 0
 
 
