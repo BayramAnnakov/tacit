@@ -213,23 +213,20 @@ async def _run_demo(repo_name: str) -> int:
     if repo_record:
         repo_id = repo_record["id"]
         existing = await db.list_rules(repo_id=repo_id)
-        if existing:
-            # Already has data — skip seeding, just show results
-            _progress(f"Found existing data ({len(existing)} rules)")
-            rules = existing
-        else:
+        if not existing:
             # Repo exists but no rules — seed demo data
-            count = await seed_demo_rules(repo_id)
-            rules = await db.list_rules(repo_id=repo_id)
-            await run_simulated_extraction(count)
+            await seed_demo_rules(repo_id)
+        rules = await db.list_rules(repo_id=repo_id)
     else:
         # Create repo and seed
         owner, name = repo_name.split("/", 1)
         record = await db.create_repo(owner, name)
         repo_id = record["id"]
-        count = await seed_demo_rules(repo_id)
+        await seed_demo_rules(repo_id)
         rules = await db.list_rules(repo_id=repo_id)
-        await run_simulated_extraction(count)
+
+    # Always show the extraction animation — it's the whole point of demo mode
+    await run_simulated_extraction(len(rules))
 
     print(file=sys.stderr)
     _print_summary(rules, repo_name)
