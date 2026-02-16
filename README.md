@@ -216,7 +216,7 @@ Today Tacit extracts knowledge from a repo's PR history. The next step is **fede
 
 2. **Central aggregation with human review.** Proposed rules flow to the CLAUDE.md owner, who accepts conventions that reflect real team patterns and rejects noise. Like federated learning: local training, central model update, human-in-the-loop.
 
-3. **The knowledge base compounds over time.** New hires get an onboarding guide generated from hundreds of real decisions. The PR validator catches violations before reviewers have to. Rules that no longer apply get downvoted and pruned.
+3. **The knowledge base compounds over time.** New hires — and new AI coding assistants — get onboarded from hundreds of real decisions. The PR validator catches violations before reviewers have to. Rules that no longer apply get downvoted and pruned.
 
 The end state: a team's CLAUDE.md writes and maintains itself — sourced from what the team actually does, not what someone remembered to document.
 
