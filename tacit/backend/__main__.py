@@ -76,8 +76,8 @@ async def main() -> int:
     parser.add_argument(
         "--max-prs",
         type=int,
-        default=20,
-        help="Maximum PRs to analyze (default: 20, was 10 in v2)",
+        default=50,
+        help="Maximum PRs to analyze (default: 50)",
     )
     parser.add_argument(
         "--json",

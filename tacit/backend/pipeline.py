@@ -65,7 +65,7 @@ async def _run_agent(
 
 async def run_extraction(
     repo: str, github_token: str, run_id: int | None = None, *,
-    exclude_ground_truth: bool = False, max_prs: int = 20,
+    exclude_ground_truth: bool = False, max_prs: int = 50,
 ) -> AsyncIterator[ExtractionEvent]:
     """Orchestrate the multi-source extraction pipeline.
 
