@@ -10,3 +10,5 @@ tacit/backend/tacit.db
 .beads/
 *.db-shm
 *.db-wal
+*.db.bak
+.firecrawl/
